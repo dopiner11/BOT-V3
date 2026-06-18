@@ -174,9 +174,25 @@ export const STATUS_EMOJI = new Proxy({}, {
 
 // Lazy imports to avoid circular dependency (cached after first call)
 let _interactionMonitor = null;
+let _embedStyles = null;
+let _notificationSystem = null;
+let _reportsCommand = null;
+
 async function getInteractionMonitor() {
   if (!_interactionMonitor) _interactionMonitor = await import('./interactionMonitor.js');
   return _interactionMonitor;
+}
+async function getEmbedStyles() {
+  if (!_embedStyles) _embedStyles = await import('./embedStyles.js');
+  return _embedStyles;
+}
+async function getNotificationSystem() {
+  if (!_notificationSystem) _notificationSystem = await import('./notificationSystem.js');
+  return _notificationSystem;
+}
+async function getReportsCommand() {
+  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
+  return _reportsCommand;
 }
 
 const NOTIFICATION_TYPES = {
@@ -518,8 +534,8 @@ export async function processAllMembers(client) {
   // Auto-escalation check after classification
   await checkAllEscalations(client, guild);
 
-  const { scheduleReportsDashboardUpdate } = await import('../commands/reports.js');
-  scheduleReportsDashboardUpdate(client, 3000);
+  const reportsCmd = await getReportsCommand();
+  reportsCmd.scheduleReportsDashboardUpdate(client, 3000);
 
   return { processed, statusCounts };
 }
@@ -582,8 +598,7 @@ export async function ensurePunishmentNotification(client, guild, dailyLog, memb
   const isFireReady = inactivityCount >= maxWarnings;
   const remaining = maxWarnings - inactivityCount;
 
-  const { warning: embedWarning, error: embedError } = await import('./embedStyles.js');
-  const { sendToChannel } = await import('./notificationSystem.js');
+  const [{ warning: embedWarning, error: embedError }, { sendToChannel }] = await Promise.all([getEmbedStyles(), getNotificationSystem()]);
   const embed = (isFireReady ? embedError : embedWarning)(
     isFireReady ? '⛔ عضو جاهز للفصل' : '⚠️ تنبيه عدم تفاعل',
     null,
@@ -917,8 +932,8 @@ async function executePunishWarning(interaction, discordId, originalMessage = nu
 
   // تحديث لوحة التقارير (مع debounce — 3 ثواني)
   try {
-    const { scheduleReportsDashboardUpdate } = await import('../commands/reports.js');
-    scheduleReportsDashboardUpdate(interaction.client, 3000);
+    const reportsCmd = await getReportsCommand();
+    reportsCmd.scheduleReportsDashboardUpdate(interaction.client, 3000);
   } catch (err) {
     console.error('Failed to schedule reports dashboard update:', err);
   }
@@ -1116,8 +1131,8 @@ ${extraInfo}
 
   // تحديث لوحة التقارير (مع debounce — 3 ثواني)
   try {
-    const { scheduleReportsDashboardUpdate } = await import('../commands/reports.js');
-    scheduleReportsDashboardUpdate(interaction.client, 3000);
+    const reportsCmd = await getReportsCommand();
+    reportsCmd.scheduleReportsDashboardUpdate(interaction.client, 3000);
   } catch (err) {
     console.error('Failed to schedule reports dashboard update:', err);
   }

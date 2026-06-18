@@ -1,0 +1,35 @@
+[
+  {
+    "discordId": "1324713142613180468",
+    "gameId": "87696",
+    "gameName": "Hassan",
+    "jobNumber": 1,
+    "roomChannelId": "1505139317679460462",
+    "currentRank": "مبتدئ",
+    "points": 0,
+    "joinDate": "2026-05-16T09:26:19.185Z",
+    "isActive": true,
+    "lastActivity": "2026-05-16T09:26:19.185Z",
+    "_id": "226",
+    "createdAt": "2026-05-16T09:26:19.185Z",
+    "updatedAt": "2026-05-16T09:26:19.185Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "gameId": "ads",
+    "gameName": "sas",
+    "level": 234,
+    "jobNumber": 2,
+    "roomChannelId": "1505139696701931733",
+    "currentRank": "مبتدئ",
+    "joinDate": "2026-05-16T09:27:48.879Z",
+    "joinMethod": "توظيف يدوي",
+    "hiredBy": "1489892734184591511",
+    "isActive": true,
+    "_id": "243",
+    "lastActivity": "2026-05-16T10:14:19.595Z",
+    "createdAt": "2026-05-16T09:27:48.879Z",
+    "updatedAt": "2026-05-16T10:14:19.595Z",
+    "points": 30
+  }
+]

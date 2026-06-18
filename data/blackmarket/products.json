@@ -1,0 +1,36 @@
+{
+  "allowed": [
+    {
+      "id": "mkxzvnyvbaj42i2gi1",
+      "name": "يشسي",
+      "price": "2",
+      "quantity": 3,
+      "available": 0,
+      "sellerId": "1231140229340069938",
+      "description": "2332",
+      "type": "allowed",
+      "createdAt": "2026-01-28T12:21:44.602Z"
+    },
+    {
+      "id": "mky2nvcghcj20og04",
+      "name": "يسشيس",
+      "price": "22",
+      "quantity": 1,
+      "available": 1,
+      "sellerId": "1231140229340069938",
+      "description": "222",
+      "type": "allowed"
+    },
+    {
+      "id": "mky2nvd9btzwy1mn95",
+      "name": "يسشيس",
+      "price": "22",
+      "quantity": 1,
+      "available": null,
+      "sellerId": "1231140229340069938",
+      "description": "222",
+      "type": "allowed"
+    }
+  ],
+  "forbidden": []
+}

@@ -1,0 +1,928 @@
+{
+  "bot": {
+    "_label": "إعدادات البوت الأساسية - التوكن والكلينت آيدي والسيرفر",
+    "token": "MTM5MzEzNjQ5ODc2MDQ4MjkyOA.GDxP8C.PY0p5ghrQjgXy1qe5W6PcSGKe4biGJGIVssyUI",
+    "clientId": "1393136498760482928",
+    "guildId": "1383643556194943108"
+  },
+  "application": {
+    "_label": "إعدادات نموذج التقديم للعائلة",
+    "title": "🌹 التقديم للعائلة",
+    "description": "✨ مرحباً بك في نظام التقديم للعائلة. للتقديم، يجب عليك استيفاء الشروط التالية:\n• أن يكون لديك Lvl 25 في لعبة GTA World\n• أن تدفع تأمين بقيمة 500,000$ للعائلة\n• أن تجتاز المقابلة الشخصية\n\nيرجى الإجابة على الأسئلة التالية بصدق.",
+    "image": "https://media.discordapp.net/attachments/1388879410198876241/1459144429242814474/Picsart_26-01-09_14-18-05-587.jpg?ex=69638725&is=696235a5&hm=c87ac6e2c549e267d7c6a17f0c9c9d94cca23874714cac6284ea04bf28f75956&=&format=webp&width=525&height=350",
+    "questions": [
+      "ما هو اسم شخصيتك؟",
+      "ما هو لفلك؟",
+      "هل انت موافق على شروط التقديم؟ (نعم/لا)",
+      "لماذا تريد الانضمام للعائلة؟",
+      "ما هو ID الخاص بك في اللعبة؟",
+      "هل قرأت وفهمت جميع القوانين المذكورة أعلاه؟"
+    ],
+    "depositAmount": 500000,
+    "minimumLevel": 25,
+    "channels": {
+      "applications": {
+        "id": "1396438047981174825",
+        "_label": "الروم اللي تنرسل فيه طلبات التقديم"
+      },
+      "adminApplications": {
+        "id": "1403787549545201704",
+        "_label": "روم مناقشة الطلبات (الإدارة)"
+      }
+    }
+  },
+  "blackMarket": {
+    "_label": "إعدادات البلاك ماركت",
+    "application": {
+      "title": "🩸 التقديم للبلاك ماركت",
+      "description": "للتقديم كبائع في البلاك ماركت، اضغط على الزر أدناه.",
+      "questions": [
+        "اسمك داخل الخادم",
+        "كم عمرك؟",
+        "ما هي خبرتك في البلاك ماركت؟",
+        "هل توافق على دفع تامين قدره 250 الف ؟"
+      ]
+    },
+    "ranks": [
+      {
+        "name": "بائع هاوي",
+        "roleId": "1388879980980867224",
+        "requiredSales": 0,
+        "requiredRating": 0
+      },
+      {
+        "name": "بائع مستوى 1",
+        "roleId": "1391345437717434440",
+        "requiredSales": 10,
+        "requiredRating": 4.5
+      },
+      {
+        "name": "بائع مستوى 2",
+        "roleId": "1391345476892098620",
+        "requiredSales": 0,
+        "requiredRating": 0
+      },
+      {
+        "name": "بائع مستوى 3",
+        "roleId": "1391345512099352667",
+        "requiredSales": 0,
+        "requiredRating": 0
+      },
+      {
+        "name": "بائع مستوى 4",
+        "roleId": "1391345549055234059",
+        "requiredSales": 0,
+        "requiredRating": 0
+      }
+    ],
+    "roles": {
+      "_label": "رتب البائع في البلاك ماركت (member = رتبة البائع الأساسية)",
+      "member": [
+        "1391345358482837597"
+      ]
+    },
+    "channels": {
+      "legal": {
+        "id": "1391170749389209730",
+        "_label": "قناة البيع القانوني"
+      },
+      "illegal": {
+        "id": "1391169061144236042",
+        "_label": "قناة البيع الغير قانوني"
+      },
+      "requests": {
+        "id": "1466048366793195733",
+        "_label": "قناة الطلبات"
+      },
+      "approvals": {
+        "id": "1466046404781805618",
+        "_label": "قناة الموافقات"
+      },
+      "logs": {
+        "id": "1463557334176633110",
+        "_label": "سجل البلاك ماركت"
+      },
+      "ratings": {
+        "id": "1391172896453558374",
+        "_label": "قناة التقييمات"
+      },
+      "admin": {
+        "id": "1389190409317646336",
+        "_label": "رتبة الإدارة"
+      }
+    }
+  },
+  "ticketSystem": {
+    "_label": "إعدادات نظام التذاكر",
+    "panelChannelId": {
+      "id": "1388879337171980420",
+      "_label": "الروم اللي تظهر فيه لوحة فتح التذاكر"
+    },
+    "panelTitle": "نظام التذاكر",
+    "panelDescription": "عدم فتح التكت لغرض المزح 🔺\nفي حالي عدم الرد لمده 12 ساعه يتم اغلاق التكت 🔺\nممنوع المنشن في التكت لاي شخص من الادارة العليا 🔺\nيمنع فتح التكت بغرض التجربه او طلب (كريديت- والمال-رتبةو غيرها ) 🔺\nيجب قراءة جميع القوانين في روم ⚙️〡𓆩الـقـوانـيـن𓆪 🔺\nفي حال مخالفه القوانين سيتم اعطائك بلاك ليست تكتات 🔺",
+    "panelImage": "https://media.discordapp.net/attachments/1388879410198876241/1459144429242814474/Picsart_26-01-09_14-18-05-587.jpg?ex=69789f25&is=69774da5&hm=7ac7b6354d646a8a13c1a01b114cdeb819b09868f4f2fee74c97c25112cac7a7&=&format=webp&width=1057&height=705",
+    "types": [
+      {
+        "value": "senior_management",
+        "label": "إدارة عليا",
+        "description": "تواصل مع الإدارة العليا",
+        "emoji": "👑",
+        "supportRoleIds": [
+          "1389190409317646336"
+        ],
+        "categoryId": "1414300340475396107"
+      },
+      {
+        "value": "alliance_request",
+        "label": "طلب تحالف",
+        "description": "طلب تحالف جديد",
+        "emoji": "🤝",
+        "supportRoleIds": [
+          "1389190409317646336"
+        ],
+        "categoryId": "1414300340475396107"
+      },
+      {
+        "value": "auction_request",
+        "label": "طلب مزاد",
+        "description": "طلب إنشاء مزاد",
+        "emoji": "💰",
+        "supportRoleIds": [
+          "1389190409317646336"
+        ],
+        "categoryId": "1414300340475396107"
+      },
+      {
+        "value": "black_market_application",
+        "label": "تقديم بلاك ماركت",
+        "description": "تذكرة تقديم ك بائع في بلاك ماركت",
+        "emoji": "🩸",
+        "supportRoleIds": [
+          "1388879998739288154",
+          "1389190409317646336"
+        ],
+        "categoryId": "1388879268800368730"
+      },
+      {
+        "value": "black_market_sale",
+        "label": "شراء من البلاك ماركت",
+        "description": "عملية شراء",
+        "emoji": "🛒",
+        "supportRoleIds": [
+          "1391345358482837597"
+        ],
+        "categoryId": "1391173429549600888"
+      },
+      {
+        "value": "scenario_excuse",
+        "label": "عذر سيناريو",
+        "description": "تقديم عذر لعدم حضور سيناريو",
+        "emoji": "📝",
+        "supportRoleIds": [
+          "1389190409317646336",
+          "1463117410394570752"
+        ],
+        "categoryId": "1414300340475396107"
+      }
+    ],
+    "panelMessageId": "1504739465154003026",
+    "channels": {
+      "transcripts": {
+        "id": "1388879451580010626",
+        "_label": "قناة نسخ التذاكر"
+      }
+    }
+  },
+  "auctions": {
+    "_label": "إعدادات نظام المزادات",
+    "categoryId": "1414199465941663744",
+    "archiveChannelId": {
+      "id": "1464662442477879511",
+      "_label": "قناة أرشيف المزادات"
+    },
+    "adminRoleId": "1389190409317646336",
+    "ticketName": "🎫-فائز-"
+  },
+  "points": {
+    "_label": "نظام النقاط - كم نقطة يعطي كل نوع تقرير",
+    "reportPoints": {
+      "_label_daily_interaction": "📊 تفاعل يومي",
+      "daily_interaction": {
+        "reporter": 45,
+        "participants": 0
+      },
+      "_label_kill_citizen": "💀 قتل مواطن",
+      "kill_citizen": {
+        "reporter": 15,
+        "participants": 8
+      },
+      "_label_kill_police": "👮 قتل شرطي",
+      "kill_police": {
+        "reporter": 20,
+        "participants": 10
+      },
+      "_label_store_robbery": "🏪 سرقة متجر",
+      "store_robbery": {
+        "reporter": 40,
+        "participants": 15
+      },
+      "_label_big_robbery": "🎪 سرقة سفينة / بنك / مصرف / متحف",
+      "big_robbery": {
+        "reporter": 35,
+        "participants": 15
+      },
+      "_label_event_participation": "🚫 تهريب ممنوعات",
+      "event_participation": {
+        "reporter": 30,
+        "participants": 15
+      },
+      "_label_scenario_participation": "👨‍👩‍👧‍👦 مشاركة سيناريو",
+      "scenario_participation": {
+        "reporter": 35,
+        "participants": 35
+      },
+      "_label_farm_participation": "🌾 مشاركة مزرعة",
+      "farm_participation": {
+        "reporter": 35,
+        "participants": 35
+      },
+      "_label_vehicle_location": "🚗 مركبة / موقع",
+      "vehicle_location": {
+        "reporter": 20,
+        "participants": 0
+      },
+      "_label_rescue_family_member": "🦸 انقاذ عائلة",
+      "rescue_family_member": {
+        "reporter": 30,
+        "participants": 15
+      }
+    },
+    "channels": {
+      "reports": {
+        "id": "1458882023015059566",
+        "_label": "قناة إرسال التقارير اليومية"
+      },
+      "reportLog": {
+        "id": "1388879389801844746",
+        "_label": "قناة سجل التقارير"
+      },
+      "adminReports": {
+        "id": "1459606238357622847",
+        "_label": "قناة تقارير الإدارة"
+      },
+      "staffReview": {
+        "id": "1459606238357622847",
+        "_label": "قناة مراجعة الموظفين"
+      }
+    }
+  },
+  "interactionMonitor": {
+    "_label": "نظام مراقبة التفاعل — المصدر الوحيد لكل شيء",
+    "violatorThreshold": {
+      "_label": "الحد الأدنى — من تجمّع أقل من هالرقم يصنف مخالف",
+      "value": 50
+    },
+    "inactiveThreshold": {
+      "_label": "الحد الأقصى للخامل — من تجمّع أقل منه وأكثر من مخالف يصنف خامل",
+      "value": 51
+    },
+    "activeThreshold": {
+      "_label": "الحد الأدنى للمتفاعل — من تجمّع هالرقم أو أكثر يصنف متفاعل",
+      "value": 100
+    },
+    "graceDays": {
+      "_label": "أيام السماح للعضو الجديد — ما ينحسب خلالها مخالف",
+      "value": 1
+    },
+    "reviewWindowHours": {
+      "_label": "كم ساعة يراجع فيها النقاط (24 = يومي، 48 = كل يومين)",
+      "value": 24
+    },
+    "analysisDays": {
+      "_label": "كم يوم يطلع متوسط النقاط للتقرير والمقترحات (7 = آخر أسبوع)",
+      "value": 7
+    },
+    "minActiveDays": {
+      "_label": "أقل عدد أيام نشاط يحتاجها العضو عشان يظهر بالتقارير",
+      "value": 3
+    },
+    "maxWarnings": {
+      "_label": "كم إنذار قبل الفصل التلقائي",
+      "value": 3
+    },
+    "emoji": {
+      "_label": "الإيموجي لكل تصنيف",
+      "active": {
+        "_label": "متفاعل",
+        "value": "🟢"
+      },
+      "inactive": {
+        "_label": "خامل",
+        "value": "🟡"
+      },
+      "violator": {
+        "_label": "مخالف",
+        "value": "🔴"
+      },
+      "warned": {
+        "_label": "مُنذَر",
+        "value": "🟤"
+      },
+      "protected": {
+        "_label": "بعذر",
+        "value": "⚫"
+      },
+      "grace": {
+        "_label": "سماح (جديد)",
+        "value": "🆕"
+      }
+    },
+    "channels": {
+      "_label": "قنوات النظام",
+      "log": {
+        "_label": "قناة سجل العقوبات",
+        "value": "1511759665615339720"
+      },
+      "alert": {
+        "_label": "قناة التنبيهات",
+        "value": "1511759665615339720"
+      },
+      "announcements": {
+        "_label": "قناة الإعلانات (للفصل وغيره)",
+        "value": "1391985954075443282"
+      },
+      "decisions": {
+        "_label": "قناة قرارات العقوبات",
+        "value": "1391986087370428607"
+      }
+    },
+    "notifications": {
+      "_label": "إعدادات الإشعارات",
+      "minIntervalHours": {
+        "_label": "أقل مدة بين إشعارين (ساعات)",
+        "value": 6
+      },
+      "worseningCooldownMinutes": {
+        "_label": "مدة التهدئة للتحذير المتكرر (دقائق)",
+        "value": 120
+      },
+      "dmOnViolation": {
+        "_label": "بعت إشعار خاص للمخالف؟",
+        "value": true
+      },
+      "dmOnInactive": {
+        "_label": "بعت إشعار خاص للخامل؟",
+        "value": false
+      }
+    },
+    "streakMilestones": {
+      "_label": "مكافآت الاستمرار — كل كم يوم يعطي مضاعف نقاط",
+      "value": [
+        {
+          "days": 3,
+          "multiplier": 1.25
+        },
+        {
+          "days": 7,
+          "multiplier": 1.5
+        },
+        {
+          "days": 14,
+          "multiplier": 2
+        },
+        {
+          "days": 21,
+          "multiplier": 2.5
+        },
+        {
+          "days": 30,
+          "multiplier": 3
+        }
+      ]
+    }
+  },
+  "warnings": {
+    "_label": "نظام العقوبات والإنذارات",
+    "maxWarnings": 3,
+    "costs": {
+      "first": 250000,
+      "second": 500000
+    },
+    "roles": {
+      "1": {
+        "id": "1388879959841312849",
+        "_label": "رتبة التحذير الأولى"
+      },
+      "2": {
+        "id": "1388879961066045531",
+        "_label": "رتبة التحذير الثانية"
+      },
+      "3": {
+        "id": "1388879958549725295",
+        "_label": "رتبة التحذير الثالثة"
+      }
+    },
+    "channels": {
+      "warningDecision": {
+        "id": "",
+        "_label": "قناة قرارات التحذير (املأ الآيدي)"
+      },
+      "warningGif": {
+        "id": "",
+        "_label": "قناة GIF التحذير (املأ الآيدي)"
+      }
+    }
+  },
+  "promotion": {
+    "_label": "نظام الرتب والترقيات",
+    "ranks": [
+      {
+        "name": "عضو جديد",
+        "roleId": "1388879980980867224",
+        "requiredDays": 0,
+        "requiredPoints": 0,
+        "responsibilityRoles": [],
+        "responsibilities": "الالتزام بالقوانين العامة للعائلة والمشاركة في الفعاليات."
+      },
+      {
+        "name": "عضو مستوى 1",
+        "roleId": "1388879982201143370",
+        "requiredDays": 7,
+        "requiredPoints": 400,
+        "responsibilityRoles": [
+          "1394242822634344458"
+        ],
+        "responsibilities": "متابعة الحضور اليومي والمشاركة في السيناريو و تنظيمه ايضا."
+      },
+      {
+        "name": "عضو مستوى 2",
+        "roleId": "1388879983388393513",
+        "requiredDays": 7,
+        "requiredPoints": 600,
+        "responsibilityRoles": [
+          "1394242929995812925"
+        ],
+        "responsibilities": "متابعة الحضور اليومي والمشاركة في السيناريو و تنظيمه ايضا."
+      },
+      {
+        "name": "عضو مستوى 3",
+        "roleId": "1388879984596222063",
+        "requiredDays": 14,
+        "requiredPoints": 700,
+        "responsibilityRoles": [
+          "1394242929995812925"
+        ],
+        "responsibilities": "قيادة التيمات ك نائب مسؤول في المهمات والإشراف على التزام الأعضاء."
+      },
+      {
+        "name": "عضو مستوى 4",
+        "roleId": "1394238953263071272",
+        "requiredDays": 14,
+        "requiredPoints": 900,
+        "responsibilityRoles": [
+          "1394242929995812925"
+        ],
+        "responsibilities": "إدارة العمليات الميدانية ورفع التقارير للإدارة العليا."
+      },
+      {
+        "name": "عضو مستوى 5",
+        "roleId": "1394239050650751036",
+        "requiredDays": 21,
+        "requiredPoints": 1000,
+        "responsibilityRoles": [
+          "1394242929995812925"
+        ],
+        "responsibilities": "الإشراف الكامل على الأعضاء مع امكانية تاسيس تيم"
+      }
+    ],
+    "channels": {
+      "nominations": {
+        "id": "1388879407401275593",
+        "_label": "قناة الترشيحات"
+      }
+    }
+  },
+  "scenarios": {
+    "_label": "نظام السيناريوهات - الفعاليات الخاصة بالعائلة",
+    "announcementChannelId": "1404027677446504520",
+    "excuseCategoryId": "",
+    "logChannelId": "1511752498254188677",
+    "archiveChannelId": "1511752498254188677",
+    "reminderMinutes": 60,
+    "editWindowMinutes": 60,
+    "voteDurationMinutes": 60,
+    "points": {
+      "attendance": 75,
+      "supervisor": 75,
+      "creator": 75,
+      "deputySupervisor": 75
+    },
+    "gifUrl": "https://media.discordapp.net/attachments/1391704768660901919/1453017760354533487/934_x_175_.gif?ex=6a217ebd&is=6a202d3d&hm=701cfed9bda4f86e99ffc1cd661fd2a3d8b6aea0a50d478a0f46e6245a5bf159&=&width=400&height=75"
+  },
+  "attendance": {
+    "_label": "نظام الحضور والاحتلال",
+    "panelChannelId": "1472547649919123620",
+    "feedChannelId": "1472547859424481280",
+    "adminLogChannelId": "1505130196427083946",
+    "minSessionMinutes": 10,
+    "maxSessionMinutes": 1440,
+    "voiceChannelIds": [
+      "1397231088245670021",
+      "1505149083222806648"
+    ],
+    "voiceWarningChannelId": "1388879370231484556",
+    "voiceGracePeriodMinutes": 10,
+    "pointsPerInterval": 15,
+    "intervalMinutes": 10,
+    "dashboardChannelId": "1505149273841467472",
+    "inactivityCooldownHours": 12,
+    "inactivityLogChannelId": "1394234230812184586"
+  },
+  "dailyChallenge": {
+    "_label": "نظام التحديات اليومية - يُرسل تحديات للأعضاء كل يوم مع مكافآت",
+    "enabled": false,
+    "assignTime": "04:00",
+    "reminderTime": "14:00",
+    "expireTime": "21:00",
+    "autoAssignOnStartup": true,
+    "logChannelId": "1506861337324818522",
+    "challengeTypes": {
+      "occupation": {
+        "enabled": true,
+        "variants": [
+          60,
+          90,
+          120,
+          180
+        ],
+        "rewards": [
+          30,
+          45,
+          60,
+          100
+        ],
+        "label": "سجّل {hours} ساعة في نظام الاحتلال"
+      },
+      "reports": {
+        "enabled": true,
+        "variants": [
+          3,
+          5,
+          7,
+          10,
+          15
+        ],
+        "rewards": [
+          30,
+          45,
+          60,
+          80,
+          100
+        ],
+        "label": "قدّم {count} تقارير"
+      },
+      "points": {
+        "enabled": true,
+        "variants": [
+          100,
+          150,
+          200,
+          250
+        ],
+        "rewards": [
+          40,
+          60,
+          80,
+          100
+        ],
+        "label": "اجمع {points} نقطة"
+      },
+      "golden_12h": {
+        "enabled": true,
+        "requirement": 80,
+        "reward": 60,
+        "label": "اجمع أول 80 نقطة في أول 12 ساعة"
+      },
+      "top_points": {
+        "enabled": true,
+        "reward": 100,
+        "label": "كن الأكثر نقاطاً اليوم"
+      },
+      "top_occupation": {
+        "enabled": true,
+        "reward": 100,
+        "label": "كن الأكثر ساعات احتلال اليوم"
+      },
+      "top_reports": {
+        "enabled": true,
+        "reward": 100,
+        "label": "كن الأكثر تقارير اليوم"
+      }
+    }
+  },
+  "broadcast": {
+    "_label": "نظام البرودكاست - إرسال رسائل جماعية للأعضاء عبر بوت ثانوي",
+    "enabled": true,
+    "senderBot": {
+      "clientId": "1395320600129437716",
+      "token": "MTM5NTMyMDYwMDEyOTQzNzcxNg.GAgA2k.yawMzoseVPRh-oB__N6aXdyl_L8EwNU2-Ie-iY"
+    },
+    "dmDelay": 3000,
+    "maxRetries": 3,
+    "logChannelId": "1505106347195371582"
+  },
+  "welcomeGuide": {
+    "_label": "نظام دليل الترحيب - يرسل دليل تفاعلي للأعضاء الجدد",
+    "autoSend": true,
+    "thumbnail": "",
+    "color": "#FFD700",
+    "deployed": true,
+    "buttons": {
+      "promotion": {
+        "label": "الترقيات والمسؤوليات",
+        "emoji": "🏆",
+        "style": "Primary"
+      },
+      "points": {
+        "label": "طرق جمع النقاط",
+        "emoji": "💰",
+        "style": "Success"
+      },
+      "report": {
+        "label": "تقديم تقرير",
+        "emoji": "📋",
+        "style": "Secondary"
+      },
+      "interaction": {
+        "label": "نظام التفاعل والاحتلال",
+        "emoji": "📊",
+        "style": "Secondary"
+      },
+      "warnings": {
+        "label": "تحذيراتك",
+        "emoji": "⚠️",
+        "style": "Danger"
+      }
+    },
+    "embeds": {
+      "welcome": {
+        "title": "🎉 مرحباً بك في العائلة!",
+        "color": "#FFD700",
+        "footer": "📌 أزرار التفاعل — اضغط عشان تتعلم"
+      },
+      "promotion_title": "🏆 تقدم رتبتك",
+      "promotion_color": "#FFD700",
+      "points_title": "💰 طرق جمع النقاط",
+      "points_color": "#00AE86",
+      "report_title": "📋 تقديم تقرير",
+      "report_color": "#5865F2",
+      "interaction_title": "📊 نظام التفاعل والاحتلال",
+      "interaction_color": "#3498DB",
+      "warnings_title": "🟤 تحذيراتك",
+      "warnings_color": "#E74C3C"
+    }
+  },
+  "logChannels": {
+    "_label": "قنوات السجلات - كل نوع حدث له قناة خاصة",
+    "points": {
+      "id": "1394234230812184586",
+      "_label": "سجل النقاط"
+    },
+    "fire": {
+      "id": "1463557298491359345",
+      "_label": "سجل الفصل"
+    },
+    "hiring": {
+      "id": "1464864734183686301",
+      "_label": "سجل التعيين"
+    },
+    "blacklist": {
+      "id": "1464864839288492156",
+      "_label": "سجل البلاك ليست"
+    },
+    "vacation": {
+      "id": "1463557377671430185",
+      "_label": "سجل الإجازات"
+    },
+    "promotion": {
+      "id": "1463557267340394674",
+      "_label": "سجل الترقيات"
+    },
+    "warning": {
+      "id": "1464864994695975198",
+      "_label": "سجل التحذيرات"
+    },
+    "auction": {
+      "id": "1464662442477879511",
+      "_label": "سجل المزادات"
+    },
+    "challenges": {
+      "id": "1506861337324818522",
+      "_label": "سجل التحديات"
+    },
+    "scenarios": {
+      "id": "1511752498254188677",
+      "_label": "سجل السيناريوهات"
+    },
+    "competitions": {
+      "id": "1513867549576794195",
+      "_label": "سجل المسابقات"
+    },
+    "calibration": {
+      "id": "",
+      "_label": "قناة تقارير المعايرة الأسبوعية (املأ الآيدي)"
+    }
+  },
+  "roles": {
+    "_label": "رتب السيرفر الأساسية",
+    "basic": {
+      "id": "1388879971677634631",
+      "_label": "رتبة العضو الأساسية (أول ما ينضم)"
+    },
+    "admin": {
+      "id": "1389190409317646336",
+      "_label": "رتبة الإدارة العليا"
+    },
+    "generalManager": {
+      "id": "1389190409317646336",
+      "_label": "رتبة المدير العام"
+    },
+    "blacklist": {
+      "id": "1388879963561918625",
+      "_label": "رتبة البلاك ليست (تتنحط على العضو الممنوع)"
+    },
+    "vacation": {
+      "id": "1392431240551858309",
+      "_label": "رتبة الإجازة"
+    },
+    "auctionBlacklist": {
+      "id": "1465298615210868931",
+      "_label": "رتبة منع المزاد"
+    },
+    "jobRoles": {
+      "1": {
+        "id": "1388879980980867224",
+        "_label": "رتبة الوظيفة 1 (أضعف)"
+      },
+      "2": {
+        "id": "1388879982201143370",
+        "_label": "رتبة الوظيفة 2"
+      },
+      "3": {
+        "id": "1388879983388393513",
+        "_label": "رتبة الوظيفة 3"
+      },
+      "4": {
+        "id": "1388879984596222063",
+        "_label": "رتبة الوظيفة 4"
+      },
+      "5": {
+        "id": "1394238953263071272",
+        "_label": "رتبة الوظيفة 5"
+      },
+      "6": {
+        "id": "1394239050650751036",
+        "_label": "رتبة الوظيفة 6 (أقوى)"
+      }
+    }
+  },
+  "committees": {
+    "_label": "نظام اللجان - هنا تحدد الرتب (roles) لكل لجنة. الصلاحيات تحدد في utils/committeePermissions.js",
+    "founders": [
+      "1489892734184591511",
+      "1335667401836073038",
+      "1413594053639016551"
+    ],
+    "_label_authorizedUsers": "مستخدمون مصرح لهم - يتجاوزون الصلاحيات مثل المؤسسين",
+    "authorizedUsers": [],
+    "panelChannelId": {
+      "id": "1464607910548996176",
+      "_label": "القناة الرئيسية اللي تظهر فيها لوحات اللجان"
+    },
+    "auditLogChannelId": {
+      "id": "1505213583938682950",
+      "_label": "قناة سجل تغييرات اللجان"
+    }
+  },
+  "general": {
+    "_label": "إعدادات عامة للبوت",
+    "activity": {
+      "type": "STREAMING",
+      "name": "𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘𓆪",
+      "url": "https://www.twitch.tv/discord"
+    },
+    "voiceChannelId": {
+      "id": "1461083909197398059",
+      "_label": "آيدي الروم الصوتي اللي يدخل فيه البوت (فارغ إذا ما تريد)"
+    },
+    "playerChannelId": "1461083907410886849",
+    "statusChannel": {
+      "channelId": {
+        "id": "1390313607677345853",
+        "_label": "قناة حالة البوت"
+      },
+      "message": "✅ البوت شغال\n🕐 شغال من: {uptime}\n👥 الأعضاء: {members}",
+      "messageId": "1504867701720485990"
+    },
+    "webhooks": {
+      "_label": "نظام الرسائل التلقائية - يرسل ويحدث 3 رسائل (تقرير + توب + لجان) كل 10 دقائق",
+      "report": {
+        "channelId": {
+          "id": "1458882023015059566",
+          "_label": "قناة تقرير التفاعل اليومي"
+        }
+      },
+      "top": {
+        "channelId": {
+          "id": "1393640951460921404",
+          "_label": "قناة قائمة أفضل الأعضاء"
+        }
+      },
+      "committees": {
+        "channelId": {
+          "id": "",
+          "_label": "قناة لوحة اللجان"
+        }
+      }
+    },
+    "categories": {
+      "tickets": {
+        "id": "1388879268800368730",
+        "_label": "الكاتيجوري اللي تفتح فيه التذاكر"
+      },
+      "memberRooms": {
+        "id": "1391683911939002379",
+        "_label": "الكاتيجوري اللي فيه غرف الأعضاء الصوتية"
+      }
+    },
+    "excuseRoles": {
+      "_label": "رتب الأعذار - الرتبة اللي تتنحط على العضو حسب نوع العذر",
+      "زيادة لفل": {
+        "id": "1396471844831494247",
+        "_label": "رتبة عذر زيادة لفل"
+      },
+      "تغير اسم": {
+        "id": "1398870600973291613",
+        "_label": "رتبة عذر تغيير اسم"
+      }
+    },
+    "embeds": {
+      "_label": "إعدادات الـ Embed الموحدة (الألوان والقوالب)",
+      "colors": {
+        "success": "#2ECC71",
+        "error": "#E74C3C",
+        "warning": "#F39C12",
+        "info": "#3498DB",
+        "neutral": "#2B2D31",
+        "gold": "#F1C40F"
+      },
+      "footer": "𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘",
+      "logFilters": {
+        "minSeverityToChannel": 3
+      }
+    },
+    "rules": {
+      "_label": "قوانين عامة",
+      "inactiveDays": 1
+    },
+    "channels": {
+      "_label": "قنوات عامة",
+      "announcements": {
+        "id": "1391985954075443282",
+        "_label": "قناة الإعلانات"
+      },
+      "rulesChannel": {
+        "id": "1388879980980867224",
+        "_label": "قناة القوانين"
+      },
+      "logChannel": {
+        "id": "1394234230812184586",
+        "_label": "قناة السجلات العامة"
+      }
+    },
+    "transcript": {
+      "_label": "إعدادات حفظ نسخ التذاكر",
+      "saveToDatabase": true,
+      "generateHTML": true,
+      "generateTXT": true,
+      "autoDeleteAfterDays": 30
+    }
+  },
+  "competitions": {
+    "_label": "نظام المسابقات",
+    "announcementChannelId": "1456339198326870168",
+    "updateChannelId": "1456339198326870168",
+    "competitionChannelId": "1456339198326870168",
+    "logChannelId": "1513867549576794195",
+    "committeeRoleId": "",
+    "presidencyRoleId": "1398209740869472286",
+    "conditions": [
+      "المسابقة مخصصة لأفراد العائلة النشطين فقط",
+      "يتم احتساب النقاط من تاريخ بدء المسابقة فقط",
+      "في حال تساوي النتيجة، يفضل صاحب الستريك الأعلى",
+      "يمنع استخدام أي طرق غش أو استغلال للثغرات",
+      "قرارات اللجنة نهائية ولا تقبل الطعن",
+      "سيتم الإعلان عن النتائج فور انتهاء المسابقة"
+    ]
+  }
+}

@@ -1,0 +1,523 @@
+[
+  {
+    "ticketNumber": 100,
+    "channelId": "1504740306883448955",
+    "userId": "1393820068034642114",
+    "claimedBy": "1489892734184591511",
+    "closedBy": "1489892734184591511",
+    "type": "alliance_request",
+    "status": "closed",
+    "messages": [
+      {
+        "messageId": "1504740308779270195",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "<@1393820068034642114> <@&1389190409317646336>  👋",
+        "embeds": [
+          {
+            "title": "🎫 تذكرة رقم #100",
+            "description": "مرحباً بك <@1393820068034642114> في تذكرتك!\n\nستقوم الإدارة بالرد عليك في أقرب وقت.",
+            "color": 16776960,
+            "fields": [
+              {
+                "name": "📋 نوع التذكرة",
+                "value": "طلب تحالف",
+                "inline": true
+              },
+              {
+                "name": "👤 صاحب التذكرة",
+                "value": "<@1393820068034642114>",
+                "inline": true
+              },
+              {
+                "name": "🆔 أيدي المستخدم",
+                "value": "1393820068034642114",
+                "inline": true
+              },
+              {
+                "name": "🔰 الحالة",
+                "value": "🟡 **تم الاستلام**",
+                "inline": true
+              },
+              {
+                "name": "👮‍♂️ مستلم التذكرة",
+                "value": "<@1489892734184591511>",
+                "inline": true
+              },
+              {
+                "name": "⏰ وقت الاستلام",
+                "value": "<t:1778828467:R>",
+                "inline": true
+              }
+            ],
+            "timestamp": "2026-05-15T07:01:07.523Z",
+            "footer": {
+              "text": "تذكرة #100 • استلمها: dopiner_02"
+            },
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-15T07:00:46.336Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1504740312415997992",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-15T07:00:47.203Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1504740365641449483",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "<@1393820068034642114>",
+        "embeds": [
+          {
+            "title": "📢 تم استلام تذكرتك",
+            "description": "تم استلام تذكرتك من قبل <@1489892734184591511>\nسيساعدك في حل مشكلتك قريباً.",
+            "color": 16776960,
+            "fields": [],
+            "timestamp": "2026-05-15T07:01:01.021Z",
+            "footer": null,
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-15T07:00:59.893Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1504740379067682837",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "<@1393820068034642114>",
+        "embeds": [
+          {
+            "title": "🔄 تم إلغاء استلام التذكرة",
+            "description": "تم الغاء الاستلام من قبل <@1489892734184591511>",
+            "color": 16750848,
+            "fields": [],
+            "timestamp": null,
+            "footer": null,
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-15T07:01:03.094Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1504740394305585152",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "<@1393820068034642114>",
+        "embeds": [
+          {
+            "title": "📢 تم استلام تذكرتك",
+            "description": "تم استلام تذكرتك من قبل <@1489892734184591511>\nسيساعدك في حل مشكلتك قريباً.",
+            "color": 16776960,
+            "fields": [],
+            "timestamp": "2026-05-15T07:01:07.837Z",
+            "footer": null,
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-15T07:01:06.727Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1504740427645849781",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "✅ تم تغيير اسم التذكرة إلى: تجربة",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-15T07:01:14.676Z",
+        "isSystem": true
+      }
+    ],
+    "closedAt": "2026-05-15T07:01:33.272Z",
+    "closeReason": "تجارب يل حبابي",
+    "transcriptId": "TR-1778828493272-100",
+    "messageCount": 6,
+    "duration": "45 ثانية",
+    "hasLinks": false,
+    "_id": "23",
+    "createdAt": "2026-05-15T07:01:33.272Z",
+    "updatedAt": "2026-05-15T07:01:33.272Z"
+  },
+  {
+    "ticketNumber": 102,
+    "channelId": "1505133869454589992",
+    "userId": "1324713142613180468",
+    "claimedBy": "1441088144240808127",
+    "closedBy": "1441088144240808127",
+    "type": "application",
+    "status": "closed",
+    "messages": [
+      {
+        "messageId": "1505133872600580128",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "<@1324713142613180468>  👋",
+        "embeds": [
+          {
+            "title": "🎫 تذكرة رقم #102",
+            "description": "مرحباً بك <@1324713142613180468> في تذكرتك!\n\nستقوم الإدارة بالرد عليك في أقرب وقت.",
+            "color": 16776960,
+            "fields": [
+              {
+                "name": "📋 نوع التذكرة",
+                "value": "📝 طلب انضمام",
+                "inline": true
+              },
+              {
+                "name": "👤 صاحب التذكرة",
+                "value": "<@1324713142613180468>",
+                "inline": true
+              },
+              {
+                "name": "🆔 أيدي المستخدم",
+                "value": "1324713142613180468",
+                "inline": true
+              },
+              {
+                "name": "🔰 الحالة",
+                "value": "🟡 **تم الاستلام**",
+                "inline": true
+              },
+              {
+                "name": "👮‍♂️ مستلم التذكرة",
+                "value": "<@1441088144240808127>",
+                "inline": true
+              },
+              {
+                "name": "⏰ وقت الاستلام",
+                "value": "<t:1778922291:R>",
+                "inline": true
+              }
+            ],
+            "timestamp": "2026-05-16T09:04:51.288000+00:00",
+            "footer": {
+              "text": "تذكرة #102 • استلمها: hussein08278"
+            },
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:04:39.263Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1505133875200917504",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:04:39.883Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1505133922139377704",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "<@1324713142613180468>",
+        "embeds": [
+          {
+            "title": "📢 تم استلام تذكرتك",
+            "description": "تم استلام تذكرتك من قبل <@1441088144240808127>\nسيساعدك في حل مشكلتك قريباً.",
+            "color": 16776960,
+            "fields": [],
+            "timestamp": "2026-05-16T09:04:51.713000+00:00",
+            "footer": null,
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:04:51.074Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1505133984865063012",
+        "authorId": "1441088144240808127",
+        "authorTag": "hussein08278",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1441088144240808127/c90dbee0968f884973b1b7bc48da8b85.webp?size=128",
+        "content": "<@1324713142613180468> غير اسمك وطك صوره",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:05:06.029Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505134015722557550",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "شلون اغيرة؟",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:05:13.386Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505134181079056395",
+        "authorId": "1405560760825937971",
+        "authorTag": "abushiba_",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1405560760825937971/f20dd573763ed9ea523f801814920f63.webp?size=128",
+        "content": "من مركز الشرطه",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:05:52.810Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505134217401602080",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "تمام",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:06:01.470Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505135666223382580",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "صارت عندي مشكلة راح اتاخر شوية",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:11:46.896Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505137586027495504",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "",
+        "embeds": [],
+        "attachments": [
+          {
+            "name": "image.png",
+            "url": "https://cdn.discordapp.com/attachments/1505133869454589992/1505137586086084629/image.png?ex=6a09881c&is=6a08369c&hm=7c35f1b657788ffcf70fab1890ce0fd9f46c2b1238e77dd77a82da75bab33f69&",
+            "contentType": "image/webp",
+            "size": 66750
+          }
+        ],
+        "timestamp": "2026-05-16T09:19:24.613Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505137969781149836",
+        "authorId": "1405560760825937971",
+        "authorTag": "abushiba_",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1405560760825937971/f20dd573763ed9ea523f801814920f63.webp?size=128",
+        "content": "عاشت ايدك",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:20:56.107Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138018581876877",
+        "authorId": "1405560760825937971",
+        "authorTag": "abushiba_",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1405560760825937971/f20dd573763ed9ea523f801814920f63.webp?size=128",
+        "content": "اذا موجود باللعبه ضيفه",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:21:07.742Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138034285482074",
+        "authorId": "1405560760825937971",
+        "authorTag": "abushiba_",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1405560760825937971/f20dd573763ed9ea523f801814920f63.webp?size=128",
+        "content": "دز ايديك",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:21:11.486Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138162836439223",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "",
+        "embeds": [],
+        "attachments": [
+          {
+            "name": "image.png",
+            "url": "https://cdn.discordapp.com/attachments/1505133869454589992/1505138162995953754/image.png?ex=6a0988a6&is=6a083726&hm=5df7637916fbabfb43108e84fc38865532f0b3f754885c79731dbd207a5e5c62&",
+            "contentType": "image/webp",
+            "size": 25764
+          }
+        ],
+        "timestamp": "2026-05-16T09:21:42.135Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138242196865044",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "87696",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:22:01.056Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138300694827118",
+        "authorId": "1405560760825937971",
+        "authorTag": "abushiba_",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1405560760825937971/f20dd573763ed9ea523f801814920f63.webp?size=128",
+        "content": "<@1441088144240808127>  طاب للعبه لو اطب اني اضيفه ؟",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:22:15.003Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138793798172732",
+        "authorId": "1441088144240808127",
+        "authorTag": "hussein08278",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1441088144240808127/c90dbee0968f884973b1b7bc48da8b85.webp?size=128",
+        "content": "تمام لحظه",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:24:12.568Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505138963558436885",
+        "authorId": "1441088144240808127",
+        "authorTag": "hussein08278",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1441088144240808127/c90dbee0968f884973b1b7bc48da8b85.webp?size=128",
+        "content": "<@1324713142613180468> اجتك دعوه",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:24:53.042Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505139013118328953",
+        "authorId": "1324713142613180468",
+        "authorTag": "gojo000272",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1324713142613180468/f9227577ba6b7a175821f8e9afedae93.webp?size=128",
+        "content": "قبلتها",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:25:04.858Z",
+        "isSystem": false
+      },
+      {
+        "messageId": "1505139312835166218",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "✅ **تم إنهاء القبول بنجاح!**\n\n**👤 العضو:** <@1324713142613180468>\n**🏠 الروم:** <#1505139317679460462>\n**💼 رقم الرتبة:** 1\n**🎖️ الأدوار المضافة:** 🏆 الرتبة الأساسية, 💼 رتبة الوظيفة (1)",
+        "embeds": [],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:26:16.316Z",
+        "isSystem": true
+      },
+      {
+        "messageId": "1505139323849281658",
+        "authorId": "1393136498760482928",
+        "authorTag": "family management bot#6043",
+        "authorAvatar": "https://cdn.discordapp.com/avatars/1393136498760482928/c973e1fc78e69e3a6ec7ccc0546a6b2e.webp?size=128",
+        "content": "",
+        "embeds": [
+          {
+            "title": "✅ تم إنهاء القبول بنجاح",
+            "description": "تم انهاء قبول العضو <@1324713142613180468> بنجاح",
+            "color": 65280,
+            "fields": [
+              {
+                "name": "🎮 اسم الشخصية",
+                "value": "Hassan",
+                "inline": true
+              },
+              {
+                "name": "🆔 أيدي اللعبة",
+                "value": "87696",
+                "inline": true
+              },
+              {
+                "name": "📈 الفل",
+                "value": "6",
+                "inline": true
+              },
+              {
+                "name": "💼 رقم الرتبة",
+                "value": "#1",
+                "inline": true
+              },
+              {
+                "name": "🏠 الروم الخاص",
+                "value": "<#1505139317679460462>",
+                "inline": true
+              },
+              {
+                "name": "🎖️ الأدوار المضافة",
+                "value": "🏆 الرتبة الأساسية\n💼 رتبة الوظيفة (1)",
+                "inline": false
+              }
+            ],
+            "timestamp": "2026-05-16T09:26:19.622000+00:00",
+            "footer": null,
+            "image": null,
+            "thumbnail": null,
+            "url": null
+          }
+        ],
+        "attachments": [],
+        "timestamp": "2026-05-16T09:26:18.942Z",
+        "isSystem": true
+      }
+    ],
+    "closedAt": "2026-05-16T09:27:53.806Z",
+    "closeReason": "تم القبول",
+    "transcriptId": "TR-1778923673807-102",
+    "messageCount": 20,
+    "duration": "23 دقيقة و 14 ثانية",
+    "hasLinks": false,
+    "_id": "245",
+    "createdAt": "2026-05-16T09:27:53.808Z",
+    "updatedAt": "2026-05-16T09:27:53.808Z"
+  }
+]

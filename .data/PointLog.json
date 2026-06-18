@@ -1,0 +1,82 @@
+[
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": null,
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (0 دقيقة)",
+    "actionBy": "system_attendance",
+    "_id": "125",
+    "createdAt": "2026-05-16T08:43:36.483Z",
+    "updatedAt": "2026-05-16T08:43:36.483Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": null,
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (0 دقيقة)",
+    "actionBy": "system_attendance",
+    "_id": "142",
+    "createdAt": "2026-05-16T08:48:49.650Z",
+    "updatedAt": "2026-05-16T08:48:49.650Z"
+  },
+  {
+    "discordId": "1441088144240808127",
+    "memberRef": null,
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (0 دقيقة)",
+    "actionBy": "system_attendance",
+    "_id": "161",
+    "createdAt": "2026-05-16T08:49:50.619Z",
+    "updatedAt": "2026-05-16T08:49:50.619Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": null,
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (0 دقيقة)",
+    "actionBy": "system_attendance",
+    "_id": "169",
+    "createdAt": "2026-05-16T08:50:53.572Z",
+    "updatedAt": "2026-05-16T08:50:53.572Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": null,
+    "points": 5,
+    "reason": "جلسة تسجيل ساعات (18 دقيقة)",
+    "actionBy": "system_attendance",
+    "_id": "207",
+    "createdAt": "2026-05-16T09:25:35.180Z",
+    "updatedAt": "2026-05-16T09:25:35.180Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": "243",
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (8 دقيقة)",
+    "actionBy": "system_attendance",
+    "_id": "256",
+    "createdAt": "2026-05-16T09:34:37.991Z",
+    "updatedAt": "2026-05-16T09:34:37.991Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": "243",
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (6 دقيقة) - أقل من الحد الأدنى",
+    "actionBy": "system_attendance",
+    "_id": "325",
+    "createdAt": "2026-05-16T10:12:55.657Z",
+    "updatedAt": "2026-05-16T10:12:55.657Z"
+  },
+  {
+    "discordId": "1489892734184591511",
+    "memberRef": "243",
+    "points": 0,
+    "reason": "جلسة تسجيل ساعات (1 دقيقة) - أقل من الحد الأدنى",
+    "actionBy": "system_attendance",
+    "_id": "368",
+    "createdAt": "2026-05-16T10:14:19.596Z",
+    "updatedAt": "2026-05-16T10:14:19.596Z"
+  }
+]

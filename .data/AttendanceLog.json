@@ -1,0 +1,317 @@
+[
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T08:43:25.187Z"
+    },
+    "timestamp": "2026-05-16T08:43:25.188Z",
+    "_id": "119",
+    "createdAt": "2026-05-16T08:43:25.188Z",
+    "updatedAt": "2026-05-16T08:43:25.188Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 0.18823333333333334,
+      "earnedMinutes": 0.18823333333333334,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T08:43:25.187Z",
+      "logoutTime": "2026-05-16T08:43:36.481Z"
+    },
+    "timestamp": "2026-05-16T08:43:36.481Z",
+    "_id": "126",
+    "createdAt": "2026-05-16T08:43:36.484Z",
+    "updatedAt": "2026-05-16T08:43:36.484Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T08:48:41.398Z"
+    },
+    "timestamp": "2026-05-16T08:48:41.401Z",
+    "_id": "134",
+    "createdAt": "2026-05-16T08:48:41.401Z",
+    "updatedAt": "2026-05-16T08:48:41.401Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 0.13751666666666668,
+      "earnedMinutes": 0.13751666666666668,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T08:48:41.398Z",
+      "logoutTime": "2026-05-16T08:48:49.649Z"
+    },
+    "timestamp": "2026-05-16T08:48:49.649Z",
+    "_id": "143",
+    "createdAt": "2026-05-16T08:48:49.651Z",
+    "updatedAt": "2026-05-16T08:48:49.651Z"
+  },
+  {
+    "type": "login",
+    "userId": "1441088144240808127",
+    "userName": "hussein08278",
+    "details": {
+      "loginTime": "2026-05-16T08:49:39.843Z"
+    },
+    "timestamp": "2026-05-16T08:49:39.844Z",
+    "_id": "153",
+    "createdAt": "2026-05-16T08:49:39.844Z",
+    "updatedAt": "2026-05-16T08:49:39.844Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1441088144240808127",
+    "userName": "hussein08278",
+    "details": {
+      "sessionMinutes": 0.17955,
+      "earnedMinutes": 0.17955,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T08:49:39.843Z",
+      "logoutTime": "2026-05-16T08:49:50.616Z"
+    },
+    "timestamp": "2026-05-16T08:49:50.616Z",
+    "_id": "162",
+    "createdAt": "2026-05-16T08:49:50.624Z",
+    "updatedAt": "2026-05-16T08:49:50.624Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T08:50:36.995Z"
+    },
+    "timestamp": "2026-05-16T08:50:37.000Z",
+    "_id": "164",
+    "createdAt": "2026-05-16T08:50:37.000Z",
+    "updatedAt": "2026-05-16T08:50:37.000Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 0.27623333333333333,
+      "earnedMinutes": 0.27623333333333333,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T08:50:36.995Z",
+      "logoutTime": "2026-05-16T08:50:53.569Z"
+    },
+    "timestamp": "2026-05-16T08:50:53.569Z",
+    "_id": "170",
+    "createdAt": "2026-05-16T08:50:53.573Z",
+    "updatedAt": "2026-05-16T08:50:53.573Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T09:07:32.055Z"
+    },
+    "timestamp": "2026-05-16T09:07:32.056Z",
+    "_id": "205",
+    "createdAt": "2026-05-16T09:07:32.056Z",
+    "updatedAt": "2026-05-16T09:07:32.056Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 18.052,
+      "earnedMinutes": 18.052,
+      "earnedPoints": 5,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T09:07:32.055Z",
+      "logoutTime": "2026-05-16T09:25:35.175Z"
+    },
+    "timestamp": "2026-05-16T09:25:35.175Z",
+    "_id": "208",
+    "createdAt": "2026-05-16T09:25:35.182Z",
+    "updatedAt": "2026-05-16T09:25:35.182Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T09:26:22.495Z"
+    },
+    "timestamp": "2026-05-16T09:26:22.496Z",
+    "_id": "228",
+    "createdAt": "2026-05-16T09:26:22.496Z",
+    "updatedAt": "2026-05-16T09:26:22.496Z"
+  },
+  {
+    "type": "admin",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "adminId": "1489892734184591511",
+    "adminName": "dopiner_02",
+    "details": {
+      "action": "force_logout",
+      "sessionMinutes": 0.3506,
+      "earnedPoints": 0,
+      "reason": "تسيت",
+      "hasMultiplier": false
+    },
+    "timestamp": "2026-05-16T09:26:43.531Z",
+    "_id": "233",
+    "createdAt": "2026-05-16T09:26:43.533Z",
+    "updatedAt": "2026-05-16T09:26:43.533Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T09:26:59.996Z"
+    },
+    "timestamp": "2026-05-16T09:26:59.998Z",
+    "_id": "238",
+    "createdAt": "2026-05-16T09:26:59.998Z",
+    "updatedAt": "2026-05-16T09:26:59.998Z"
+  },
+  {
+    "type": "admin",
+    "userId": "1489892734184591511",
+    "userName": "1489892734184591511",
+    "adminId": "1489892734184591511",
+    "adminName": "dopiner_02",
+    "details": {
+      "action": "add_hours",
+      "oldValue": {
+        "minutes": 19.004583333333333,
+        "points": 5
+      },
+      "newValue": {
+        "minutes": 79.00458333333333,
+        "points": 35
+      },
+      "reason": "dsad"
+    },
+    "timestamp": "2026-05-16T09:28:22.448Z",
+    "_id": "253",
+    "createdAt": "2026-05-16T09:28:22.448Z",
+    "updatedAt": "2026-05-16T09:28:22.448Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 7.6332,
+      "earnedMinutes": 7.6332,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T09:26:59.996Z",
+      "logoutTime": "2026-05-16T09:34:37.988Z"
+    },
+    "timestamp": "2026-05-16T09:34:37.988Z",
+    "_id": "257",
+    "createdAt": "2026-05-16T09:34:37.992Z",
+    "updatedAt": "2026-05-16T09:34:37.992Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T09:34:46.938Z"
+    },
+    "timestamp": "2026-05-16T09:34:46.940Z",
+    "_id": "262",
+    "createdAt": "2026-05-16T09:34:46.940Z",
+    "updatedAt": "2026-05-16T09:34:46.940Z"
+  },
+  {
+    "type": "admin",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "adminId": "1489892734184591511",
+    "adminName": "dopiner_02",
+    "details": {
+      "action": "force_logout",
+      "sessionMinutes": 0.48305,
+      "earnedPoints": 0,
+      "reason": "test",
+      "hasMultiplier": false
+    },
+    "timestamp": "2026-05-16T09:35:15.921Z",
+    "_id": "291",
+    "createdAt": "2026-05-16T09:35:15.922Z",
+    "updatedAt": "2026-05-16T09:35:15.922Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T10:06:58.915Z"
+    },
+    "timestamp": "2026-05-16T10:06:58.918Z",
+    "_id": "322",
+    "createdAt": "2026-05-16T10:06:58.919Z",
+    "updatedAt": "2026-05-16T10:06:58.919Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 5.945616666666667,
+      "earnedMinutes": 0,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T10:06:58.915Z",
+      "logoutTime": "2026-05-16T10:12:55.652Z"
+    },
+    "timestamp": "2026-05-16T10:12:55.652Z",
+    "_id": "326",
+    "createdAt": "2026-05-16T10:12:55.658Z",
+    "updatedAt": "2026-05-16T10:12:55.658Z"
+  },
+  {
+    "type": "login",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "loginTime": "2026-05-16T10:13:06.903Z"
+    },
+    "timestamp": "2026-05-16T10:13:06.904Z",
+    "_id": "341",
+    "createdAt": "2026-05-16T10:13:06.904Z",
+    "updatedAt": "2026-05-16T10:13:06.904Z"
+  },
+  {
+    "type": "logout",
+    "userId": "1489892734184591511",
+    "userName": "dopiner_02",
+    "details": {
+      "sessionMinutes": 1.2115,
+      "earnedMinutes": 0,
+      "earnedPoints": 0,
+      "hasMultiplier": false,
+      "loginTime": "2026-05-16T10:13:06.903Z",
+      "logoutTime": "2026-05-16T10:14:19.593Z"
+    },
+    "timestamp": "2026-05-16T10:14:19.593Z",
+    "_id": "369",
+    "createdAt": "2026-05-16T10:14:19.597Z",
+    "updatedAt": "2026-05-16T10:14:19.597Z"
+  }
+]

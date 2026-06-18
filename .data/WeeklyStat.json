@@ -1,0 +1,39 @@
+[
+  {
+    "weekStart": "2026-05-27T21:00:00.925Z",
+    "weekEnd": "2026-06-03T21:00:00.925Z",
+    "weekLabel": "2026-05-28 ~ 2026-06-03",
+    "activeMembers": 2,
+    "totalMembers": 2,
+    "medianDailyPoints": 0,
+    "meanDailyPoints": 0,
+    "p25": 0,
+    "p75": 0,
+    "violatorCount": 0,
+    "inactiveCount": 0,
+    "activeLowCount": 0,
+    "activeHighCount": 0,
+    "protectedCount": 0,
+    "graceCount": 0,
+    "promotionsCount": 0,
+    "firingsCount": 0,
+    "newApplications": 0,
+    "rankStats": [
+      {
+        "name": "مبتدئ",
+        "memberCount": 2,
+        "activeCount": 2,
+        "inactiveCount": 0,
+        "p25": 0,
+        "p50": 0,
+        "p75": 0,
+        "mean": 0,
+        "requiredPoints": 0,
+        "requiredDays": 0
+      }
+    ],
+    "_id": "371",
+    "createdAt": "2026-06-04T06:48:19.995Z",
+    "updatedAt": "2026-06-04T06:48:19.995Z"
+  }
+]

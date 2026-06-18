@@ -1,0 +1,25 @@
+[
+  {
+    "reporterId": "1489892734184591511",
+    "reporterName": "dopiner_02",
+    "reportType": "kill_citizen",
+    "title": "يمميمس",
+    "participants": [],
+    "evidence": "https://cdn.discordapp.com/attachments/1459615234451968022/1504743178505289758/IMG_3273.png?ex=6a0818ca&is=6a06c74a&hm=87a951bbe18e9913f71669eb7733dd5000df3a501524e5781dc48e5edbaedac0&",
+    "status": "accepted",
+    "_id": "30",
+    "_tempLocalPath": "temp_9a1c38e1ee9836ef.jpg",
+    "_tempLocalName": "preview_1778829132545.jpg",
+    "createdAt": "2026-05-15T07:12:18.487Z",
+    "updatedAt": "2026-05-15T07:12:30.746Z",
+    "reviewChannelId": "1459606238357622847",
+    "reviewMessageId": "1504743212496064562",
+    "reviewedBy": "1489892734184591511",
+    "reviewedAt": "2026-05-15T07:12:30.744Z",
+    "pointsAwarded": {
+      "reporter": 30,
+      "participants": 16
+    },
+    "doublePoints": true
+  }
+]

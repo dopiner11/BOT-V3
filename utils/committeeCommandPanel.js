@@ -8,6 +8,63 @@ import { dmUser, sendToChannel } from './notificationSystem.js';
 import { logWarning, logFire, logBlacklist, logBlacklistRemove, logPoints } from './logSystem.js';
 import { getInteractionConfig } from './interactionMonitor.js';
 
+// Lazy-loaded imports (cached after first call)
+let _interactionMonitor = null;
+let _reportsCommand = null;
+let _WarningModel = null;
+async function getIntMonitor() {
+  if (!_interactionMonitor) _interactionMonitor = await import('./interactionMonitor.js');
+  return _interactionMonitor;
+}
+async function getReportsCmd() {
+  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
+  return _reportsCommand;
+}
+async function getWarningModel() {
+  if (!_WarningModel) _WarningModel = (await import('../models/Warning.js')).default;
+  return _WarningModel;
+}
+let _MemberModel = null;
+async function getMemberModel() {
+  if (!_MemberModel) _MemberModel = (await import('../models/Member.js')).default;
+  return _MemberModel;
+}
+let _BlacklistModel = null;
+async function getBlacklistModel() {
+  if (!_BlacklistModel) _BlacklistModel = (await import('../models/Blacklist.js')).default;
+  return _BlacklistModel;
+}
+let _AttendanceModel = null;
+async function getAttendanceModel() {
+  if (!_AttendanceModel) _AttendanceModel = (await import('../models/Attendance.js')).default;
+  return _AttendanceModel;
+}
+let _AttendanceLogModel = null;
+async function getAttendanceLogModel() {
+  if (!_AttendanceLogModel) _AttendanceLogModel = (await import('../models/AttendanceLog.js')).default;
+  return _AttendanceLogModel;
+}
+let _VacationModel = null;
+async function getVacationModel() {
+  if (!_VacationModel) _VacationModel = (await import('../models/Vacation.js')).default;
+  return _VacationModel;
+}
+let _ExcuseModel = null;
+async function getExcuseModel() {
+  if (!_ExcuseModel) _ExcuseModel = (await import('../models/Excuse.js')).default;
+  return _ExcuseModel;
+}
+let _TicketModel = null;
+async function getTicketModel() {
+  if (!_TicketModel) _TicketModel = (await import('../models/Ticket.js')).default;
+  return _TicketModel;
+}
+let _interactionManager = null;
+async function getIntManager() {
+  if (!_interactionManager) _interactionManager = await import('./interactionManager.js');
+  return _interactionManager;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CONFIG_PATH = join(__dirname, '../config.json');
@@ -591,9 +648,9 @@ async function handleWarningModal(interaction) {
     return interaction.editReply('❌ نوع التحذير غير صحيح. الأنواع: شفوي, عدم تفاعل, سلوك');
   }
 
-  const Warning = (await import('../models/Warning.js')).default;
-  const { updateRoomEmoji, STATUS } = await import('./interactionMonitor.js');
-  const { updateReportsDashboard } = await import('../commands/reports.js');
+  const Warning = await getWarningModel();
+  const { updateRoomEmoji, STATUS } = await getIntMonitor();
+  const { updateReportsDashboard } = await getReportsCmd();
 
   const warning = new Warning({
     memberId: targetUserId,
@@ -652,7 +709,7 @@ async function handleWarningModal(interaction) {
   const numArabic = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس'][activeCount - 1] || `${warningNum}`;
 
   if (matchedType.type === 'inactivity') {
-    const Member = (await import('../models/Member.js')).default;
+    const Member = await getMemberModel();
     const memberDoc = await Member.findOne({ discordId: targetUserId });
     if (memberDoc) {
       memberDoc.lastActivity = new Date();
@@ -696,7 +753,7 @@ async function handleWarningModal(interaction) {
   });
 
   if (matchedType.type === 'inactivity') {
-    const Member = (await import('../models/Member.js')).default;
+    const Member = await getMemberModel();
     await Member.findOneAndUpdate(
       { discordId: targetUserId },
       { $set: { violatorWarningSentAt: new Date() } }
@@ -730,7 +787,7 @@ async function handleRemoveWarningModal(interaction) {
     return interaction.reply({ content: '❌ العضو غير موجود.', flags: MessageFlags.Ephemeral });
   }
 
-  const Warning = (await import('../models/Warning.js')).default;
+  const Warning = await getWarningModel();
   const warnings = await Warning.find({ memberId: targetUserId, removed: false });
   if (!warnings.length) {
     return interaction.reply({ content: `❌ ${targetUser} ليس لديه تحذيرات نشطة.`, flags: MessageFlags.Ephemeral });
@@ -758,7 +815,7 @@ async function executeRemoveWarning(interaction, targetUserId, targetUser, warn,
   if (gm) {
     const roles = Object.values(config.warnings?.roles || {}).filter(id => id);
     for (const r of roles) await gm.roles.remove(r).catch(() => {});
-    const count = await (await import('../models/Warning.js')).default.countDocuments({ memberId: targetUserId, removed: false });
+    const count = await (await getWarningModel()).countDocuments({ memberId: targetUserId, removed: false });
     const nextRole = config.warnings?.roles?.[count.toString()];
     if (nextRole) await gm.roles.add(nextRole).catch(() => {});
   }
@@ -816,8 +873,8 @@ async function handleFireModal(interaction) {
 }
 
 async function executeFire(interaction, userIds, reason) {
-  const Member = (await import('../models/Member.js')).default;
-  const Warning = (await import('../models/Warning.js')).default;
+  const Member = await getMemberModel();
+  const Warning = await getWarningModel();
   const config = loadConfig();
 
   const results = { success: [], failed: [], notFound: [] };
@@ -868,11 +925,7 @@ async function executeFire(interaction, userIds, reason) {
           `لقد تم اتخاذ قرار بفصلك من عائلة X.IRAQ.\n\n**السبب:** ${reason}`, fireFields));
       }
 
-      const Attendance = (await import('../models/Attendance.js')).default;
-      const AttendanceLog = (await import('../models/AttendanceLog.js')).default;
-      const Vacation = (await import('../models/Vacation.js')).default;
-      const Excuse = (await import('../models/Excuse.js')).default;
-      const Ticket = (await import('../models/Ticket.js')).default;
+      const [Attendance, AttendanceLog, Vacation, Excuse, Ticket] = await Promise.all([getAttendanceModel(), getAttendanceLogModel(), getVacationModel(), getExcuseModel(), getTicketModel()]);
 
       await Promise.all([
         Attendance.deleteMany({ userId }),
@@ -974,7 +1027,7 @@ async function handleBlacklistModal(interaction) {
     return interaction.reply({ content: '❌ العضو غير موجود.', flags: MessageFlags.Ephemeral });
   }
 
-  const Blacklist = (await import('../models/Blacklist.js')).default;
+  const Blacklist = await getBlacklistModel();
   const existing = await Blacklist.findOne({ userId: targetUserId, isActive: true });
   if (existing) {
     return interaction.reply({ content: '❌ العضو مضاف بالفعل للبلاك ليست.', flags: MessageFlags.Ephemeral });
@@ -1005,14 +1058,14 @@ async function executeBlacklist(interaction, pending) {
 
   let expiresAt = duration > 0 ? new Date(Date.now() + duration * 86400000) : null;
 
-  const Blacklist = (await import('../models/Blacklist.js')).default;
+  const Blacklist = await getBlacklistModel();
   await Blacklist.create({
     userId: targetUserId, username: targetUserTag, reason, category, duration,
     addedBy: interaction.user.id, addedByName: interaction.user.username, expiresAt,
     isPermanent: duration === 0, isActive: true,
   });
 
-  const Member = (await import('../models/Member.js')).default;
+  const Member = await getMemberModel();
   const member = await Member.findOne({ discordId: targetUserId });
   if (member) {
     member.isActive = false; member.leftDate = new Date(); member.leftReason = `بلاك ليست: ${reason}`;
@@ -1041,7 +1094,7 @@ async function executeBlacklist(interaction, pending) {
 async function handleForceInteractionReview(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
   try {
-    const { runManualReview } = await import('./interactionManager.js');
+    const { runManualReview } = await getIntManager();
     await interaction.editReply({ content: '⏳ جاري مراجعة التفاعل لجميع الأعضاء وتحديث الإيموجيات...' }).catch(() => {});
     const result = await runManualReview(interaction.guild, interaction.client);
     const counts = result.statusCounts || {};

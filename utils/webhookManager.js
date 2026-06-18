@@ -5,6 +5,22 @@ import PersistentMessage from '../models/PersistentMessage.js';
 import { buildLeaderboardEmbed, buildButtonRows } from './interactiveLeaderboard.js';
 import { custom as embedCustom } from './embedStyles.js';
 
+let _reportsCommand = null;
+let _attendanceHandler = null;
+let _competitionSystem = null;
+async function getReportsCmd() {
+  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
+  return _reportsCommand;
+}
+async function getAttendanceHandler() {
+  if (!_attendanceHandler) _attendanceHandler = await import('./attendanceHandler.js');
+  return _attendanceHandler;
+}
+async function getCompetitionSystem() {
+  if (!_competitionSystem) _competitionSystem = await import('./competitionSystem.js');
+  return _competitionSystem;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -116,7 +132,7 @@ const WEBHOOK_TYPES = ['report', 'top'];
 
 async function updateWebhook(client, type) {
   if (type === 'report') {
-    const { updateReportsDashboard } = await import('../commands/reports.js');
+    const { updateReportsDashboard } = await getReportsCmd();
     await updateReportsDashboard(client, false);
     return;
   }
@@ -175,10 +191,10 @@ export async function startWebhookSystem(client) {
 
     await updateAllCommittees(client);
 
-    const { updateAttendanceDashboard } = await import('./attendanceHandler.js');
+    const { updateAttendanceDashboard } = await getAttendanceHandler();
     await updateAttendanceDashboard(client, false).catch(e => console.error('[Webhook]', e?.message));
 
-    const { updateAllCompetitionEmbeds } = await import('./competitionSystem.js');
+    const { updateAllCompetitionEmbeds } = await getCompetitionSystem();
     await updateAllCompetitionEmbeds(client).catch(e => console.error('[Webhook] competition:', e?.message));
 
     console.log('✅ Webhook system started.');
@@ -193,10 +209,10 @@ export async function startWebhookSystem(client) {
 
       await updateAllCommittees(client);
 
-      const { updateAttendanceDashboard } = await import('./attendanceHandler.js');
+      const { updateAttendanceDashboard } = await getAttendanceHandler();
       await updateAttendanceDashboard(client, false).catch(e => console.error('[Webhook]', e?.message));
 
-      const { updateAllCompetitionEmbeds } = await import('./competitionSystem.js');
+      const { updateAllCompetitionEmbeds } = await getCompetitionSystem();
       await updateAllCompetitionEmbeds(client).catch(e => console.error('[Webhook] competition:', e?.message));
     } catch (err) {
       if (err.code !== 'UND_ERR_SOCKET' && err.code !== 'ECONNRESET' && err.code !== 'EPIPE' && err.code !== 'ETIMEDOUT') {
@@ -219,7 +235,7 @@ export async function forceUpdateWebhook(client, type) {
     return true;
   }
   if (type === 'report') {
-    const { updateReportsDashboard } = await import('../commands/reports.js');
+    const { updateReportsDashboard } = await getReportsCmd();
     await updateReportsDashboard(client, true);
     return true;
   }

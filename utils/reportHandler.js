@@ -27,6 +27,33 @@ const __dirname = dirname(__filename);
 const REPORT_TEMP_DIR = join(__dirname, '../.data/report-temp');
 if (!existsSync(REPORT_TEMP_DIR)) mkdirSync(REPORT_TEMP_DIR, { recursive: true });
 
+// Lazy-loaded imports (cached after first call)
+let _reportsCommand = null;
+let _MemberModel = null;
+let _ReportModel = null;
+let _DoublePointsModel = null;
+let _PointLogModel = null;
+async function getReportsCmd() {
+  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
+  return _reportsCommand;
+}
+async function getMemberModel() {
+  if (!_MemberModel) _MemberModel = (await import('../models/Member.js')).default;
+  return _MemberModel;
+}
+async function getReportModel() {
+  if (!_ReportModel) _ReportModel = (await import('../models/Report.js')).default;
+  return _ReportModel;
+}
+async function getDoublePointsModel() {
+  if (!_DoublePointsModel) _DoublePointsModel = (await import('../models/DoublePoints.js')).default;
+  return _DoublePointsModel;
+}
+async function getPointLogModel() {
+  if (!_PointLogModel) _PointLogModel = (await import('../models/PointLog.js')).default;
+  return _PointLogModel;
+}
+
 // Load config dynamically
 function loadConfig() {
   try {
@@ -420,7 +447,7 @@ async function handleDoublePointsToggle(interaction) {
     });
   }
 
-  const DoublePoints = (await import('../models/DoublePoints.js')).default;
+  const DoublePoints = await getDoublePointsModel();
   let doublePoints = await DoublePoints.findOne({ type: 'report' });
   const isCurrentlyActive = doublePoints?.isActive;
 
@@ -473,7 +500,7 @@ async function handleDoublePointsModal(interaction) {
 
   const expiresAt = new Date(Date.now() + duration * 60 * 60 * 1000);
 
-  const DoublePoints = (await import('../models/DoublePoints.js')).default;
+  const DoublePoints = await getDoublePointsModel();
   let doublePoints = await DoublePoints.findOne({ type: 'report' });
   if (!doublePoints) {
     doublePoints = new DoublePoints();
@@ -507,7 +534,7 @@ async function handleDoublePointsModal(interaction) {
 
   setTimeout(async () => {
     try {
-      const DoublePoints = (await import('../models/DoublePoints.js')).default;
+      const DoublePoints = await getDoublePointsModel();
       const current = await DoublePoints.findById(doublePoints._id);
       if (!current || !current.isActive) return;
       if (current.activatedAt?.getTime() !== doublePoints.activatedAt?.getTime()) return;
@@ -554,7 +581,7 @@ async function refreshPanel(interaction) {
   // إظهار حالة ضعف النقاط
   let doublePointsStatus = 'غير مفعّل';
   try {
-    const DoublePoints = (await import('../models/DoublePoints.js')).default;
+    const DoublePoints = await getDoublePointsModel();
     const dp = await DoublePoints.findOne({ isActive: true, type: 'report' }).catch(() => null);
     if (dp) {
       if (dp.expiresAt && new Date(dp.expiresAt) < new Date()) {
@@ -618,7 +645,7 @@ async function handleReportStats(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   try {
-    const Report = (await import('../models/Report.js')).default;
+    const Report = await getReportModel();
 
     const allReports = await Report.find();
     const total = allReports.length;
@@ -716,8 +743,8 @@ async function handleReportSubmission(interaction) {
 
   await interaction.deferUpdate().catch(() => {});
 
-  const Report = (await import('../models/Report.js')).default;
-  const Member = (await import('../models/Member.js')).default;
+  const Report = await getReportModel();
+  const Member = await getMemberModel();
   const reporterMember = await Member.findOne({ discordId: interaction.user.id });
 
   const report = new Report({
@@ -866,7 +893,7 @@ async function handleReportAcceptance(interaction) {
     });
   }
 
-  const Report = (await import('../models/Report.js')).default;
+  const Report = await getReportModel();
   const messageId = interaction.message.id;
   const report = await Report.findOne({ reviewMessageId: messageId });
 
@@ -890,7 +917,7 @@ async function handleReportAcceptance(interaction) {
 
   const reportPoints = getReportPoints();
   const pointsConfig = reportPoints[report.reportType] || { reporter: 0, participants: 0 };
-  const DoublePoints = (await import('../models/DoublePoints.js')).default;
+  const DoublePoints = await getDoublePointsModel();
   let doublePoints = await DoublePoints.findOne({ isActive: true, type: 'report' }).catch(() => null);
   if (doublePoints && doublePoints.expiresAt && new Date(doublePoints.expiresAt) < new Date()) {
     doublePoints.isActive = false;
@@ -935,14 +962,14 @@ async function handleReportAcceptance(interaction) {
 
   const awardResults = await awardPoints(interaction, report);
   await sendReportToLogChannel(interaction, report, awardResults);
-  const { scheduleReportsDashboardUpdate } = await import('../commands/reports.js');
-  scheduleReportsDashboardUpdate(interaction.client);
+  const reportsCmd = await getReportsCmd();
+  reportsCmd.scheduleReportsDashboardUpdate(interaction.client);
 }
 
 async function awardPoints(interaction, report) {
   const results = [];
-  const Member = (await import('../models/Member.js')).default;
-  const PointLog = (await import('../models/PointLog.js')).default;
+  const Member = await getMemberModel();
+  const PointLog = await getPointLogModel();
 
   try {
     const { pointsAwarded } = report;
@@ -1157,7 +1184,7 @@ async function handleRejectionModal(interaction) {
   const reason = interaction.fields.getTextInputValue('reject_reason');
   const messageId = interaction.customId.replace('reject_modal_', '');
 
-  const Report = (await import('../models/Report.js')).default;
+  const Report = await getReportModel();
   const report = await Report.findOne({ reviewMessageId: messageId });
 
   if (!report) {
@@ -1503,7 +1530,7 @@ export default reportHandler;
 // فحص وانتهاء صلاحية DoublePoints تلقائياً عند بدء التشغيل
 (async function checkExpiredDoublePoints() {
   try {
-    const DoublePoints = (await import('../models/DoublePoints.js')).default;
+    const DoublePoints = await getDoublePointsModel();
     const expired = await DoublePoints.find({ isActive: true, expiresAt: { $lt: new Date() } }).catch(() => []);
     for (const dp of expired) {
       dp.isActive = false;
@@ -1518,7 +1545,7 @@ export default reportHandler;
 // فحص دوري كل دقيقة
 setInterval(async () => {
   try {
-    const DoublePoints = (await import('../models/DoublePoints.js')).default;
+    const DoublePoints = await getDoublePointsModel();
     const expired = await DoublePoints.find({ isActive: true, expiresAt: { $lt: new Date() } }).catch(() => []);
     for (const dp of expired) {
       dp.isActive = false;

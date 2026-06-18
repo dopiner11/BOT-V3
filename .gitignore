@@ -6,12 +6,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
 node_modules
 dist
 dist-ssr
 *.local
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,9 +20,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+<<<<<<< HEAD
 
 # Database files
 .data/
 
+=======
+# Database files
+.data/
+>>>>>>> fc924408617c21f5c9f448279bc0a6fb3965aaa1
 # Ignored for the template, you probably want to remove it:
 package-lock.json

@@ -20,6 +20,24 @@ function loadConfig() {
 
 const activeQueues = new Map();
 
+function hasQueuePermission(member) {
+  const cfg = loadConfig();
+  const pres = cfg.committees?.list?.family_presidency;
+  const allowed = [
+    ...(cfg.committees?.list?.punishment?.roles?.manager || []),
+    ...(cfg.committees?.list?.punishment?.roles?.deputy || []),
+    ...(cfg.committees?.list?.punishment?.roles?.member || []),
+    ...(cfg.committees?.list?.interaction?.roles?.manager || []),
+    ...(cfg.committees?.list?.interaction?.roles?.deputy || []),
+    ...(cfg.committees?.list?.interaction?.roles?.member || []),
+    ...(pres?.roles?.manager || []),
+    ...(pres?.roles?.deputy || []),
+    ...(pres?.roles?.member || []),
+    ...(cfg.committees?.founders || []),
+  ];
+  return allowed.some(r => r === member.id || member.roles?.cache?.has(r));
+}
+
 /* ===================================================================
    بناء القائمة — مسح المخالفين المستحقين إنذار
    =================================================================== */
@@ -125,6 +143,10 @@ export async function handleQueueInteraction(interaction) {
   const { customId } = interaction;
   if (!customId.startsWith('pun_queue_')) return false;
 
+  if (!hasQueuePermission(interaction.member)) {
+    return interaction.reply({ content: '❌ فقط لجنة العقوبات ولجنة التفاعل والرئاسة تملك الصلاحية.', flags: MessageFlags.Ephemeral });
+  }
+
   let q, qId;
   for (const [id, qq] of activeQueues) {
     if (qq.msgId === (interaction.message?.id || id)) { q = qq; qId = id; break; }
@@ -212,6 +234,10 @@ export async function handleQueueInteraction(interaction) {
 export async function handleQueueModal(interaction) {
   const { customId } = interaction;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  if (!hasQueuePermission(interaction.member)) {
+    return interaction.editReply({ content: '❌ فقط لجنة العقوبات ولجنة التفاعل والرئاسة تملك الصلاحية.' });
+  }
 
   // مسامحة الكل
   if (customId === 'pun_queue_forgive_all_modal') {

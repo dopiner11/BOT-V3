@@ -17,8 +17,10 @@ import Ticket from '../models/Ticket.js';
 import { logWarning, logFire, logForgive } from './logSystem.js';
 import { getWeeklyTrends } from './weeklyCalibration.js';
 import { analyzeChurn } from './churnAnalyzer.js';
-import { success as embedSuccess, error as embedError } from './embedStyles.js';
+import { success as embedSuccess, error as embedError, warning as embedWarning, info as embedInfo } from './embedStyles.js';
+import { dmUser, sendToChannel } from './notificationSystem.js';
 import { getDaysInRank } from './promotionManager.js';
+import { startWeeklyCalibration } from './weeklyCalibration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -172,16 +174,11 @@ export const STATUS_EMOJI = new Proxy({}, {
   },
 });
 
-// Lazy imports to avoid circular dependency (cached after first call)
-let _interactionMonitor = null;
+// Lazy imports (cached after first call)
 let _embedStyles = null;
 let _notificationSystem = null;
 let _reportsCommand = null;
 
-async function getInteractionMonitor() {
-  if (!_interactionMonitor) _interactionMonitor = await import('./interactionMonitor.js');
-  return _interactionMonitor;
-}
 async function getEmbedStyles() {
   if (!_embedStyles) _embedStyles = await import('./embedStyles.js');
   return _embedStyles;
@@ -491,11 +488,11 @@ export async function initializeInteractionStatus(client) {
   if (!guild) return;
   const members = await Member.find({ isActive: true, _lastInteractionStatus: { $exists: false } });
   if (members.length === 0) return;
-  const { assessMemberStatus } = await getInteractionMonitor();
   let count = 0;
   for (const m of members) {
     try {
       await assessMemberStatus(client, guild, m.discordId, { silentInit: true });
+
       count++;
     } catch (e) {
       console.error(`[Init] Error for ${m.discordId}:`, e?.message);
@@ -522,6 +519,10 @@ export async function processAllMembers(client) {
       if (result) {
         statusCounts[result.status] = (statusCounts[result.status] || 0) + 1;
         processed++;
+        const emoji = getStatusEmoji(result.status);
+        m._lastInteractionStatus = result.status;
+        await m.save().catch(() => {});
+        await updateRoomEmoji(guild, m.discordId, emoji).catch(() => {});
       }
 
     } catch (e) {
@@ -531,8 +532,19 @@ export async function processAllMembers(client) {
 
   console.log(`[InteractionManager] ✅ ${processed} عضو مصنف`, statusCounts);
 
-  // Auto-escalation check after classification
+  // Auto-escalation check after classification (fire only)
   await checkAllEscalations(client, guild);
+
+  // بناء قائمة الإنذارات للمخالفين المتبقين (غير الجاهزين للفصل)
+  try {
+    const { buildWarningQueue, sendQueueMessage } = await import('./punishmentQueue.js');
+    const items = await buildWarningQueue(guild, client);
+    if (items.length > 0) {
+      await sendQueueMessage(guild, items);
+    }
+  } catch (e) {
+    console.error('[InteractionSystem] Queue build error:', e?.message);
+  }
 
   const reportsCmd = await getReportsCommand();
   reportsCmd.scheduleReportsDashboardUpdate(client, 3000);
@@ -596,11 +608,13 @@ export async function ensurePunishmentNotification(client, guild, dailyLog, memb
   const inactivityCount = inactivityWarnings.length;
   const maxWarnings = getInteractionConfig().maxWarnings;
   const isFireReady = inactivityCount >= maxWarnings;
-  const remaining = maxWarnings - inactivityCount;
 
-  const [{ warning: embedWarning, error: embedError }, { sendToChannel }] = await Promise.all([getEmbedStyles(), getNotificationSystem()]);
-  const embed = (isFireReady ? embedError : embedWarning)(
-    isFireReady ? '⛔ عضو جاهز للفصل' : '⚠️ تنبيه عدم تفاعل',
+  // إذا العضو غير جاهز للفصل — لا نرسل إشعار فردي (يدخل القائمة بدلاً منه)
+  if (!isFireReady) return;
+
+  const [{ error: embedError }, { sendToChannel }] = await Promise.all([getEmbedStyles(), getNotificationSystem()]);
+  const embed = embedError(
+    '⛔ عضو جاهز للفصل',
     null,
     [
       { name: 'العضو', value: `${user || dailyLog.discordId} (${dailyLog.discordId})`, inline: false },
@@ -611,24 +625,17 @@ export async function ensurePunishmentNotification(client, guild, dailyLog, memb
     ]
   ).setThumbnail(user?.displayAvatarURL({ dynamic: true }) || null);
 
-  const warningBtn = new ButtonBuilder()
-    .setCustomId(`punish_warn_${dailyLog.discordId}`)
-    .setLabel(isFireReady ? '🚫 وصل الحد الأعلى' : `⚠️ إعطاء إنذار (${remaining})`)
-    .setStyle(isFireReady ? ButtonStyle.Secondary : ButtonStyle.Danger)
-    .setDisabled(isFireReady);
-
   const fireBtn = new ButtonBuilder()
     .setCustomId(`punish_fire_${dailyLog.discordId}`)
     .setLabel('❌ فصل')
-    .setStyle(ButtonStyle.Danger)
-    .setDisabled(!isFireReady);
+    .setStyle(ButtonStyle.Danger);
 
   const forgiveBtn = new ButtonBuilder()
     .setCustomId(`punish_forgive_${dailyLog.discordId}`)
     .setLabel('🤝 تسامح / عدم عقوبة')
     .setStyle(ButtonStyle.Success);
 
-  const row = new ActionRowBuilder().addComponents(warningBtn, forgiveBtn, fireBtn);
+  const row = new ActionRowBuilder().addComponents(fireBtn, forgiveBtn);
 
   if (dailyLog.committeeMsgId) {
     try {
@@ -641,7 +648,7 @@ export async function ensurePunishmentNotification(client, guild, dailyLog, memb
   }
 
   const msg = await channel.send({
-    content: `<@&${config.roles?.admin?.id || ''}> عضو يحتاج انتباه`,
+    content: `<@&${config.roles?.admin?.id || ''}> عضو جاهز للفصل`,
     embeds: [embed],
     components: [row],
   }).catch(() => null);
@@ -809,8 +816,7 @@ export async function handlePunishForgiveModal(interaction) {
 
     const result = await quickClassify(discordId);
     if (result && result.emoji) {
-      const mon = await getInteractionMonitor();
-      await mon.updateRoomEmoji(interaction.guild, discordId, result.emoji).catch(() => {});
+      await updateRoomEmoji(interaction.guild, discordId, result.emoji).catch(() => {});
     }
 
     if (originalMessage) {
@@ -924,8 +930,7 @@ async function executePunishWarning(interaction, discordId, originalMessage = nu
     { $set: { violatorWarningSentAt: new Date() } }
   );
   try {
-    const mon = await getInteractionMonitor();
-    await mon.updateRoomEmoji(interaction.guild, discordId, mon.STATUS.WARNED);
+    await updateRoomEmoji(interaction.guild, discordId, getStatusEmoji(STATUS.WARNED));
   } catch (err) {
     console.error('Failed to update room emoji:', err);
   }
@@ -1021,7 +1026,36 @@ async function executePunishFire(interaction, discordId, originalMessage = null)
     );
   }
 
-  // إزالة الرتب في الديسكورد وحذف الروم المخصص للعضو
+  // نشر القرار في قناة الإعلانات أولاً (قبل الطرد عشان الـ mention يشتغل)
+  const annChannelId = config.general?.channels?.announcements?.id || getInteractionConfig().channels.announcements;
+  const annChannel = annChannelId ? (guild.channels.cache.get(annChannelId) || await guild.channels.fetch(annChannelId).catch(() => null)) : null;
+  if (annChannel) {
+    await annChannel.send({ content: 'https://media.discordapp.net/attachments/1391704768660901919/1453017755392671899/934_x_175_.gif' }).catch(() => {});
+
+    let extraInfo = '';
+    if (warningsCount > 0) extraInfo += `\n**تم إزالة ${warningsCount} تحذير(ات).**`;
+    if (vacationsBroken > 0) extraInfo += `\n**تم كسر ${vacationsBroken} إجازة.**`;
+    if (excusesCancelled > 0) extraInfo += `\n**تم إلغاء ${excusesCancelled} عذر.**`;
+
+    const decision = `
+****قرار صادر من قيادة 𓆩 <:Family:1516647836744417320> 𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪****
+
+**بعد الاطلاع على ملف العضو وإيقافه عن العمل قررنا الآتي:**
+
+**فصل للمدعو/ين:**
+- <@${discordId}>
+
+**السبب:** عدم تفاعل مستمر (٣ إنذارات عدم تفعيل)
+${extraInfo}
+
+**امضاء محرر القرار:** ${interaction.user}
+**امضاء لجنة العقوبات:** <@&1398212916389478442>
+
+**▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬**`.trim();
+    await annChannel.send({ content: decision }).catch(() => {});
+  }
+
+  // بعد القرار — إزالة الرتب وحذف الروم (الـ mention اشتغل خلاص)
   try {
     if (discordMember) {
       const rolesToRemove = [];
@@ -1092,39 +1126,9 @@ async function executePunishFire(interaction, discordId, originalMessage = null)
     await sendDM(user, null, dmEmbed);
   }
 
-  // نشر القرار في قناة الإعلانات
-  const annChannelId = config.general?.channels?.announcements?.id || getInteractionConfig().channels.announcements;
-  const annChannel = annChannelId ? (guild.channels.cache.get(annChannelId) || await guild.channels.fetch(annChannelId).catch(() => null)) : null;
-  if (annChannel) {
-    await annChannel.send({ content: 'https://media.discordapp.net/attachments/1391704768660901919/1453017755392671899/934_x_175_.gif' }).catch(() => {});
-
-    let extraInfo = '';
-    if (warningsCount > 0) extraInfo += `\n**تم إزالة ${warningsCount} تحذير(ات).**`;
-    if (vacationsBroken > 0) extraInfo += `\n**تم كسر ${vacationsBroken} إجازة.**`;
-    if (excusesCancelled > 0) extraInfo += `\n**تم إلغاء ${excusesCancelled} عذر.**`;
-
-    const decision = `
-****قرار صادر من قيادة 𓆩 <:Family:1516647836744417320> 𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪****
-
-**بعد الاطلاع على ملف العضو وإيقافه عن العمل قررنا الآتي:**
-
-**فصل للمدعو/ين:**
-- <@${discordId}>
-
-**السبب:** عدم تفاعل مستمر (٣ إنذارات عدم تفعيل)
-${extraInfo}
-
-**امضاء محرر القرار:** ${interaction.user}
-**امضاء لجنة العقوبات:** <@&1398212916389478442>
-
-**▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬**`.trim();
-    await annChannel.send({ content: decision }).catch(() => {});
-  }
-
   // تحديث ايموجي الروم
   try {
-    const mon = await getInteractionMonitor();
-    await mon.updateRoomEmoji(guild, discordId);
+    await updateRoomEmoji(guild, discordId);
   } catch (err) {
     console.error('Failed to update room emoji:', err);
   }
@@ -1362,6 +1366,12 @@ export function startDailyClassification(client) {
         log.status = newStatus;
         if (log.date !== todayDate) log.date = todayDate;
         await log.save();
+
+        // تحديث الإيموجي فوراً عند تحسن العضو
+        const newEmoji = getStatusEmoji(newStatus);
+        await updateRoomEmoji(guild, log.discordId, newEmoji).catch(() => {});
+        member._lastInteractionStatus = newStatus;
+        await member.save().catch(() => {});
       }
     }
   });
@@ -1771,16 +1781,14 @@ export async function runManualReview(guild, client) {
   let roomUpdates = 0;
   for (const m of members) {
     try {
-      const mon = await getInteractionMonitor();
       const classification = await quickClassify(m.discordId);
       if (classification && classification.emoji) {
-        await mon.updateRoomEmoji(guild, m.discordId, classification.emoji);
+        await updateRoomEmoji(guild, m.discordId, classification.emoji);
         roomUpdates++;
       }
     } catch (e) {
       console.error(`[ManualReview] Error updating emoji for ${m.discordId}:`, e.message);
     }
-    // Small delay to avoid rate limit issues
     await new Promise(r => setTimeout(r, 150));
   }
 
@@ -1788,6 +1796,15 @@ export async function runManualReview(guild, client) {
     ...result,
     roomUpdates
   };
+}
+
+export async function buildAndSendWarningQueue(guild, client) {
+  const { buildWarningQueue, sendQueueMessage } = await import('./punishmentQueue.js');
+  const items = await buildWarningQueue(guild, client);
+  if (items.length > 0) {
+    await sendQueueMessage(guild, items);
+  }
+  return items;
 }
 
 /* ===================================================================
@@ -1973,3 +1990,264 @@ export async function auditInteractionThresholds() {
     note: allZero ? '⚠️ كل الأعضاء بدون نقاط — تم استخدام fallback' : '',
   };
 }
+
+/* ===================================================================
+   interactionMonitor.js — دوال مراقبة التفاعل
+   =================================================================== */
+
+const GRACE24H_MS = 24 * 60 * 60 * 1000;
+
+function getReviewWindowAgo() {
+  return new Date(Date.now() - getInteractionConfig().reviewWindowHours * 3600000);
+}
+
+export async function assessMemberStatus(client, guild, discordId, { silentInit = false } = {}) {
+  const result = await quickClassify(discordId);
+  if (!result.member) return false;
+
+  const currentStatus = result.status;
+  const statusEmoji = result.emoji;
+  const dailyPoints = result.points;
+
+  const prevStatus = result.member._lastInteractionStatus;
+
+  if (prevStatus === undefined && silentInit) {
+    result.member._lastInteractionStatus = currentStatus;
+    await result.member.save().catch(e => console.error('[InteractionMonitor]', e?.message));
+    return true;
+  }
+
+  if (prevStatus === currentStatus) return false;
+
+  await updateRoomEmoji(guild, discordId, statusEmoji);
+
+  const user = await client.users.fetch(discordId).catch(() => null);
+  if (user && currentStatus !== STATUS.PROTECTED && currentStatus !== STATUS.GRACE) {
+    const ic = getInteractionConfig();
+    const violatorThreshold = ic.violatorThreshold;
+    const activeThreshold = ic.activeThreshold;
+
+    let type;
+    if (currentStatus === STATUS.VIOLATOR || currentStatus === STATUS.WARNED) type = 'violator';
+    else if (currentStatus === STATUS.INACTIVE) type = 'inactive';
+    else type = 'active';
+
+    await sendDM(user, type, dailyPoints, violatorThreshold, activeThreshold, guild);
+  }
+
+  result.member._lastInteractionStatus = currentStatus;
+  await result.member.save().catch(e => console.error('[InteractionMonitor]', e?.message));
+
+  return true;
+}
+
+export async function createGracePeriod(userId, reason, guild, client, relatedInfo) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + GRACE24H_MS);
+
+  await Grace24h.deleteMany({ userId }).catch(e => console.error('Failed to clear old grace periods:', e));
+
+  const grace = await Grace24h.create({ userId, expiresAt, reason, createdAt: now });
+  await notifyGracePeriod(userId, reason, guild, client, relatedInfo);
+
+  return grace;
+}
+
+async function notifyGracePeriod(userId, reason, guild, client, relatedInfo) {
+  const user = await client?.users.fetch(userId).catch(() => null);
+  const logChannelId = getInteractionConfig().channels.log;
+
+  let dmText, logText, logColor;
+
+  switch (reason) {
+    case 'vacation_broken':
+      dmText = `✅ تم كسر إجازتك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.\nالسبب: ${relatedInfo?.reason || ''}`;
+      logText = `🕐 **فترة سماح 24 ساعة** — تم كسر إجازة <@${userId}>`;
+      logColor = 0xFF9900;
+      break;
+    case 'vacation_ended':
+      dmText = `✅ انتهت إجازتك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.`;
+      logText = `🕐 **فترة سماح 24 ساعة** — انتهت إجازة <@${userId}> تلقائياً`;
+      logColor = 0xFF9900;
+      break;
+    case 'excuse_broken':
+      dmText = `✅ تم كسر عذرك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.\nالسبب: ${relatedInfo?.reason || ''}`;
+      logText = `🕐 **فترة سماح 24 ساعة** — تم كسر عذر <@${userId}>${relatedInfo?.type ? ` (${relatedInfo.type})` : ''}`;
+      logColor = 0xFF9900;
+      break;
+    case 'excuse_ended':
+      dmText = `✅ انتهى عذرك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.`;
+      logText = `🕐 **فترة سماح 24 ساعة** — انتهى عذر <@${userId}> تلقائياً`;
+      logColor = 0xFF9900;
+      break;
+    case 'new_member':
+      dmText = `🎉 مرحباً بك في العائلة! لديك 24 ساعة فترة سماح للتفاعل وجمع النقاط.`;
+      logText = `🆕 **فترة سماح 24 ساعة** — عضو جديد: <@${userId}>`;
+      logColor = 0x00FF00;
+      break;
+    default:
+      dmText = `✅ لديك 24 ساعة فترة سماح للتفاعل.`;
+      logText = `🕐 **فترة سماح 24 ساعة** — <@${userId}>`;
+      logColor = 0xFF9900;
+  }
+
+  const graceFields = [
+    { name: 'العضو', value: `<@${userId}> (${userId})`, inline: true },
+    { name: 'تنتهي في', value: `<t:${Math.floor((Date.now() + GRACE24H_MS) / 1000)}:R>`, inline: true },
+  ];
+  if (relatedInfo?.reason) graceFields.push({ name: 'السبب', value: relatedInfo.reason, inline: false });
+  if (relatedInfo?.by) graceFields.push({ name: 'بواسطة', value: relatedInfo.by, inline: true });
+  const embed = embedWarning('🕐 فترة سماح 24 ساعة', logText, graceFields);
+
+  if (user) {
+    await dmUser(user, embed);
+  }
+
+  if (guild && logChannelId) {
+    const logChan = guild.channels.cache.get(logChannelId) || await guild.channels.fetch(logChannelId).catch(() => null);
+    if (logChan) await sendToChannel(logChan, embed);
+  }
+}
+
+async function sendNotificationLog(guild, title, description, fields, embedType = 'info') {
+  const channelId = getInteractionConfig().channels.log;
+  if (!guild || !channelId) return;
+  const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel) return;
+  const fn = { warning: embedWarning, success: embedSuccess, info: embedInfo, error: embedError }[embedType] || embedInfo;
+  await sendToChannel(channel, fn(title, description, fields));
+}
+
+async function sendDM(user, type, points, violatorThreshold, activeThreshold, guild) {
+  let embed, statusLabel, embedType;
+  if (type === 'violator') {
+    statusLabel = 'مخالف';
+    embedType = 'error';
+    embed = embedError('🔴 إنذار عدم تفاعل',
+      `عزيزي ${user}،\n\nلم يتم تسجيل أي نقاط كافية لك خلال اليوم.\n\n**نقاطك اليوم:** ${points}\n**الحد الأدنى المطلوب:** ${violatorThreshold} نقطة\n\nأنت الآن في قائمة المخالفين. يرجى التفاعل فوراً لتجنب العقوبات.`,
+      [
+        { name: 'نقاط اليوم', value: `${points}`, inline: true },
+        { name: 'الحد الأدنى', value: `${violatorThreshold}`, inline: true },
+      ]);
+  } else if (type === 'inactive') {
+    statusLabel = 'خامل';
+    embedType = 'warning';
+    embed = embedWarning('🟡 تنبيه خمول',
+      `عزيزي ${user}،\n\nنشاطك ضعيف اليوم.\n\n**نقاطك اليوم:** ${points}\n**الحد الأدنى للتفاعل الكامل:** ${activeThreshold} نقطة\n\nنرجو منك العودة للتفاعل مع العائلة.`,
+      [
+        { name: 'نقاط اليوم', value: `${points}`, inline: true },
+        { name: 'الحد الأدنى', value: `${activeThreshold}`, inline: true },
+      ]);
+  } else if (type === 'active') {
+    statusLabel = 'متفاعل';
+    embedType = 'success';
+    embed = embedSuccess('✅ أحسنت!',
+      `عزيزي ${user}،\n\nنشكرك على تفاعلك المستمر! ❤️\n\n**نقاطك اليوم:** ${points}\n\nأنت الآن في قائمة المتفاعلين 🟢\n\nاستمر على هذا المستوى 👏`);
+  }
+
+  const ok = await dmUser(user, embed);
+  const logFields = [
+    { name: 'العضو', value: `${user.tag} (${user.id})`, inline: true },
+    { name: 'الحالة', value: statusLabel, inline: true },
+    { name: 'نقاط اليوم', value: `${points}`, inline: true },
+  ];
+
+  if (ok) {
+    sendNotificationLog(guild, '📋 إشعار تفاعل', `تم إرسال إشعار **${statusLabel}** إلى ${user}`, logFields, embedType);
+  } else {
+    sendNotificationLog(guild, '⚠️ فشل إرسال إشعار تفاعل', `فشل إرسال إشعار **${statusLabel}** إلى ${user}`, logFields, 'error');
+  }
+  return ok;
+}
+
+export async function updateRoomEmoji(guild, discordId, emoji) {
+  const member = await Member.findOne({ discordId });
+  if (!member || !member.roomChannelId) return;
+  const channel = guild.channels.cache.get(member.roomChannelId);
+  if (!channel) return;
+
+  if (!emoji) {
+    const result = await quickClassify(discordId);
+    emoji = result.emoji || '❌';
+  }
+
+  const oldPrefix = channel.name.match(/^(.+?)〢/)?.[1] || '';
+  if (oldPrefix === emoji) return;
+
+  const newName = channel.name.replace(/^.+?〢/, `${emoji}〢`);
+  await channel.setName(newName).catch(e => console.error('[InteractionMonitor]', e?.message));
+}
+
+export async function updateAllRoomEmojis(guild) {
+  if (!guild) return;
+  const members = await Member.find({ isActive: true });
+
+  for (const member of members) {
+    await updateRoomEmoji(guild, member.discordId);
+    await sleep(150);
+  }
+}
+
+export async function loadBatchData() {
+  const ic = getInteractionConfig();
+  const now = new Date();
+  const graceDate = new Date(now.getTime() - ic.graceDays * 24 * 60 * 60 * 1000);
+
+  const [members, activeVacations, activeExcuses, activeGracePeriods, recentPoints,
+    newMembers, todayInactivityWarnings] = await Promise.all([
+    Member.find({ isActive: true }),
+    Vacation.find({ status: 'active', endDate: { $gte: now } }),
+    Excuse.find({ isActive: { $ne: false }, type: { $ne: 'تغير اسم' }, endDate: { $gte: now } }),
+    Grace24h.find({ expiresAt: { $gt: now } }),
+    PointLog.aggregate([
+      { $match: { createdAt: { $gte: getReviewWindowAgo() } } },
+      { $group: { _id: '$discordId', total: { $sum: '$points' } } }
+    ]),
+    Member.find({ createdAt: { $gte: graceDate } }),
+    Warning.find({ warningType: 'inactivity', status: 'active', removed: false }),
+  ]);
+
+  const pointsMap = new Map(recentPoints.map(p => [p._id, Math.max(0, p.total)]));
+  const protectedIds = new Set([...activeVacations.map(v => v.memberId), ...activeExcuses.map(e => e.memberId)]);
+  const graceIds = new Set(newMembers.map(m => m.discordId));
+  const activeGraceIds = new Set(activeGracePeriods.map(g => g.userId));
+  const warnedIds = new Set(todayInactivityWarnings.map(w => w.memberId));
+  const violatorThreshold = ic.violatorThreshold;
+  const activeThreshold = ic.activeThreshold;
+
+  return { members, pointsMap, protectedIds, graceIds, activeGraceIds, warnedIds, violatorThreshold, activeThreshold, inactiveThreshold: activeThreshold };
+}
+
+export async function getInteractionData() {
+  const data = await loadBatchData();
+
+  let active = 0, inactive = 0, violator = 0, violatorWarned = 0, protected_ = 0, grace = 0;
+
+  for (const m of data.members) {
+    if (data.protectedIds.has(m.discordId)) { protected_++; continue; }
+    if (data.graceIds.has(m.discordId) || data.activeGraceIds.has(m.discordId)) { grace++; continue; }
+    const pts = data.pointsMap.get(m.discordId) ?? 0;
+    if (pts < data.violatorThreshold) {
+      if (data.warnedIds.has(m.discordId)) violatorWarned++;
+      else violator++;
+    } else if (pts < (data.inactiveThreshold || data.activeThreshold)) inactive++;
+    else active++;
+  }
+
+  const total = data.members.length;
+  return { total, active, inactive, violator, violatorWarned, protected: protected_, grace };
+}
+
+export function startInteractionChecker(client) {
+  startDailyClassification(client);
+  startWeeklyCalibration(client);
+  initializeInteractionStatus(client).catch(e => console.error('[Init]', e?.message));
+  console.log(`⏰ تم تفعيل مراجعة التفاعل (محاسبة كل ${getInteractionConfig().reviewWindowHours} ساعة)`);
+}
+
+async function checkAllMembers(client) {
+  await processAllMembers(client);
+}
+
+export { getWeeklyTrends, computeWeeklyStats, startWeeklyCalibration } from './weeklyCalibration.js';
+export { analyzeChurn, analyzeBreakpoints } from './churnAnalyzer.js';

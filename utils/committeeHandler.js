@@ -629,7 +629,7 @@ async function handleInteractionReview(interaction) {
     }
 
     try {
-        const { runManualReview } = await import('./interactionManager.js');
+        const { runManualReview } = await import('./interactionSystem.js');
         
         await interaction.editReply({ content: '⏳ جاري تشغيل مراجعة التفاعل لجميع الأعضاء وتحديث إيموجيات الرومات... قد يستغرق هذا بضع ثوانٍ.' }).catch(() => {});
         

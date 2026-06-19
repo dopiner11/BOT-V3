@@ -18,13 +18,13 @@ import {
 } from './utils/attendanceHandler.js';
 import { handleCommitteeInteraction, refreshAllCommitteePanels, checkCommandPermission, checkButtonPermission } from './utils/committeeHandler.js';
 import { startStatusUpdates } from './utils/statusHandler.js';
-import { startInteractionChecker } from './utils/interactionMonitor.js';
+import { startInteractionChecker } from './utils/interactionSystem.js';
 import { startCleanupScheduler } from './utils/cleanupExpired.js';
 import { startWebhookSystem } from './utils/webhookManager.js';
 import { startExcuseNotifications } from './commands/Excuse.js';
 import { startVoteExpiryChecker } from './utils/voteManager.js';
 import { setOvertakeGuild } from './utils/rankTracker.js';
-import { updateAllRoomEmojis, handlePunishmentButton } from './utils/interactionMonitor.js';
+import { updateAllRoomEmojis, handlePunishmentButton } from './utils/interactionSystem.js';
 import { handleGuideButton, deployGuideToAllMembers } from './utils/welcomeGuide.js';
 import {
   handleShowPanel, handlePanelSelect, handlePanelModal, handleConfirmButton, handleSwitchCommittee
@@ -253,7 +253,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       // مودال التسامح (تتجاوز صلاحية لأن الزر تحقق مسبقاً)
       if (customId.startsWith('forgive_reason_')) {
-        const { handlePunishForgiveModal } = await import('./utils/interactionManager.js');
+        const { handlePunishForgiveModal } = await import('./utils/interactionSystem.js');
         return await handlePunishForgiveModal(interaction);
       }
 
@@ -295,6 +295,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return await handlePromotionQueueModal(interaction);
       }
 
+      // مودالات قائمة العقوبات
+      if (customId.startsWith('pun_queue_')) {
+        const { handleQueueModal } = await import('./utils/punishmentQueue.js');
+        return await handleQueueModal(interaction);
+      }
+
       return await handleModalSubmit(interaction);
     }
 
@@ -318,6 +324,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (customId.startsWith('prom_queue_')) {
         const { handlePromotionQueueInteraction } = await import('./commands/promotion.js');
         return await handlePromotionQueueInteraction(interaction);
+      }
+
+      // أزرار قائمة العقوبات
+      if (customId.startsWith('pun_queue_')) {
+        const { handleQueueInteraction } = await import('./utils/punishmentQueue.js');
+        return await handleQueueInteraction(interaction);
       }
 
       // أزرار مشغل القرآن (عامة للجميع)
@@ -476,6 +488,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId.startsWith('prom_queue_select_')) {
         const { handlePromotionQueueInteraction } = await import('./commands/promotion.js');
         return await handlePromotionQueueInteraction(interaction);
+      }
+      if (interaction.customId === 'pun_queue_select') {
+        const { handleQueueInteraction } = await import('./utils/punishmentQueue.js');
+        return await handleQueueInteraction(interaction);
       }
       if (interaction.customId.startsWith('qp_')) {
         const { handleQuranInteraction } = await import('./utils/quranPlayer.js');

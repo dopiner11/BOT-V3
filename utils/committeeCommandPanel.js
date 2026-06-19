@@ -6,16 +6,11 @@ import { committees as permCommittees } from './committeePermissions.js';
 import { success as embedSuccess, error as embedError, warning as embedWarning, info as embedInfo, neutral as embedNeutral } from './embedStyles.js';
 import { dmUser, sendToChannel } from './notificationSystem.js';
 import { logWarning, logFire, logBlacklist, logBlacklistRemove, logPoints } from './logSystem.js';
-import { getInteractionConfig } from './interactionMonitor.js';
+import { getInteractionConfig } from './interactionSystem.js';
 
 // Lazy-loaded imports (cached after first call)
-let _interactionMonitor = null;
 let _reportsCommand = null;
 let _WarningModel = null;
-async function getIntMonitor() {
-  if (!_interactionMonitor) _interactionMonitor = await import('./interactionMonitor.js');
-  return _interactionMonitor;
-}
 async function getReportsCmd() {
   if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
   return _reportsCommand;
@@ -59,10 +54,10 @@ async function getTicketModel() {
   if (!_TicketModel) _TicketModel = (await import('../models/Ticket.js')).default;
   return _TicketModel;
 }
-let _interactionManager = null;
+let _interactionSystem = null;
 async function getIntManager() {
-  if (!_interactionManager) _interactionManager = await import('./interactionManager.js');
-  return _interactionManager;
+  if (!_interactionSystem) _interactionSystem = await import('./interactionSystem.js');
+  return _interactionSystem;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -649,7 +644,7 @@ async function handleWarningModal(interaction) {
   }
 
   const Warning = await getWarningModel();
-  const { updateRoomEmoji, STATUS } = await getIntMonitor();
+  const { updateRoomEmoji, STATUS } = await getIntManager();
   const { updateReportsDashboard } = await getReportsCmd();
 
   const warning = new Warning({
@@ -668,7 +663,7 @@ async function handleWarningModal(interaction) {
   const decisionChannelId = config.warnings?.channels?.warningDecision?.id || getInteractionConfig().channels.decisions;
   const warningGif = config.warnings?.channels?.warningGif?.id || 'https://media.discordapp.net/attachments/1391704768660901919/1453017758328557629/934_x_175_.gif';
   const basicRoleId = config.roles?.basic?.id || '1388879971677634631';
-  const announcementChannel = interaction.guild.channels.cache.get(decisionChannelId);
+  const announcementChannel = decisionChannelId ? (interaction.guild.channels.cache.get(decisionChannelId) || await interaction.guild.channels.fetch(decisionChannelId).catch(() => null)) : null;
 
   if (matchedType.type === 'oral') {
     if (announcementChannel) {
@@ -951,7 +946,8 @@ async function executeFire(interaction, userIds, reason) {
   }
 
   if (results.success.length > 0) {
-    const annChannel = interaction.guild.channels.cache.get(config.general?.channels?.announcements?.id || '1391985954075443282');
+    const annChannelId = config.general?.channels?.announcements?.id || '1391985954075443282';
+    const annChannel = interaction.guild.channels.cache.get(annChannelId) || await interaction.guild.channels.fetch(annChannelId).catch(() => null);
     if (annChannel) {
       await annChannel.send({ content: 'https://media.discordapp.net/attachments/1391704768660901919/1453017755392671899/934_x_175_.gif' }).catch(() => {});
       const totalWarningsRemoved = warningsStats.reduce((sum, stat) => sum + stat.count, 0);

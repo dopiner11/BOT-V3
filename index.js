@@ -489,7 +489,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handlePromotionQueueInteraction } = await import('./commands/promotion.js');
         return await handlePromotionQueueInteraction(interaction);
       }
-      if (interaction.customId === 'pun_queue_select') {
+      if (interaction.customId === 'pun_queue_sel') {
         const { handleQueueInteraction } = await import('./utils/punishmentQueue.js');
         return await handleQueueInteraction(interaction);
       }

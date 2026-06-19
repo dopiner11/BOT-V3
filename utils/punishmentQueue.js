@@ -1,292 +1,205 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags, EmbedBuilder } from 'discord.js';
-import DailyLog from '../models/DailyLog.js';
-import Member from '../models/Member.js';
-import Warning from '../models/Warning.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getInteractionConfig, STATUS, getStatusEmoji, quickClassify, updateRoomEmoji, formatDate, ensureDailyLog } from './interactionSystem.js';
-import { warning as embedWarning, success as embedSuccess, info as embedInfo } from './embedStyles.js';
-import { logWarning } from './logSystem.js';
-import { dmUser } from './notificationSystem.js';
+import DayLog from '../models/DailyLog.js';
+import Member from '../models/Member.js';
+import Warn from '../models/Warning.js';
+import { getInteractionConfig, STATUS, getStatusEmoji, formatDate, ensureDailyLog } from './interactionSystem.js';
+import { warning as embedWarn, info as embedInfo } from './embedStyles.js';
+import { logWarning, logForgive } from './logSystem.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-function loadConfig() {
-  try {
-    return JSON.parse(readFileSync(join(__dirname, '../config.json'), 'utf8'));
-  } catch { return {}; }
-}
-
 const WARN_GIF = 'https://media.discordapp.net/attachments/1391704768660901919/1453017759565746197/934_x_175_.gif';
 
-// In-memory queue store (map of messageId -> queue data)
+function loadConfig() {
+  try { return JSON.parse(readFileSync(join(__dirname, '../config.json'), 'utf8')); }
+  catch { return {}; }
+}
+
 const activeQueues = new Map();
 
 /* ===================================================================
-   بناء قائمة الانتظار — مسح الأعضاء المخالفين
+   بناء القائمة — مسح المخالفين المستحقين إنذار
    =================================================================== */
-export async function buildWarningQueue(guild, client) {
-  const todayDate = formatDate(new Date());
-  const maxWarnings = getInteractionConfig().maxWarnings;
+export async function buildWarningQueue(guild) {
+  const today = formatDate(new Date());
+  const maxW = getInteractionConfig().maxWarnings;
 
-  // أعضاء مخالفين لم يسامحوا بعد
-  const violatorLogs = await DailyLog.find({
-    date: todayDate,
+  const violators = await DayLog.find({
+    date: today,
     status: { $in: [STATUS.VIOLATOR, STATUS.WARNED] },
     $or: [{ forgiven: { $ne: true } }, { forgiven: { $exists: false } }]
   });
 
   const items = [];
-
-  for (const log of violatorLogs) {
+  for (const log of violators) {
     try {
-      const memberData = await Member.findOne({ discordId: log.discordId });
-      if (!memberData || !memberData.isActive) continue;
-
+      const m = await Member.findOne({ discordId: log.discordId });
+      if (!m || !m.isActive) continue;
       const gm = await guild.members.fetch(log.discordId).catch(() => null);
       if (!gm) continue;
-
-      const activeWarnings = await Warning.find({ memberId: log.discordId, warningType: 'inactivity', status: 'active', removed: false });
-      const warningCount = activeWarnings.length;
-
-      if (warningCount >= maxWarnings) continue;
-
+      const warns = await Warn.find({ memberId: log.discordId, warningType: 'inactivity', status: 'active', removed: false });
+      if (warns.length >= maxW) continue;
       items.push({
-        discordId: log.discordId,
-        gm,
-        memberData,
-        dailyLog: log,
-        warningCount,
-        nextWarningNum: warningCount + 1,
-        status: 'pending',
-        reason: '',
+        discordId: log.discordId, gm, memberData: m, dailyLog: log,
+        warningCount: warns.length,
+        nextNum: warns.length + 1,
       });
     } catch (e) {
-      console.error(`[PunishmentQueue] Error building item for ${log.discordId}:`, e?.message);
+      console.error('[PunishmentQueue] build error:', e?.message);
     }
   }
-
   return items;
 }
 
 /* ===================================================================
-   إرسال رسالة القائمة إلى قناة اللجنة
+   إرسال رسالة القائمة
    =================================================================== */
-export async function sendQueueMessage(guildOrInteraction, items) {
-  const guild = guildOrInteraction.guild || guildOrInteraction;
-  const alertChannelId = getInteractionConfig().channels.alert;
-  const logChannel = alertChannelId ? (guild.channels.cache.get(alertChannelId) || await guild.channels.fetch(alertChannelId).catch(() => null)) : null;
-  if (!logChannel || items.length === 0) return;
+export async function sendQueueMessage(guildOrInt, items) {
+  const guild = guildOrInt.guild || guildOrInt;
+  const chId = getInteractionConfig().channels.alert;
+  const ch = chId ? (guild.channels.cache.get(chId) || await guild.channels.fetch(chId).catch(() => null)) : null;
+  if (!ch || items.length === 0) return;
 
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId('pun_queue_select')
-    .setPlaceholder('اختر عضواً لعرض التفاصيل')
-    .addOptions(items.slice(0, 25).map((item, i) => ({
-      label: item.gm?.displayName || item.discordId,
-      description: `إنذار (${item.nextWarningNum}) | ${item.status === 'approved' ? '✅' : item.status === 'rejected' ? '❌' : '⏳'}`,
+  const sel = new StringSelectMenuBuilder()
+    .setCustomId('pun_queue_sel')
+    .setPlaceholder('اختر عضواً')
+    .addOptions(items.slice(0, 25).map((it, i) => ({
+      label: it.gm?.displayName || it.discordId,
+      description: `إنذار (${it.nextNum})`,
       value: `${i}`,
     })));
 
-  const allReviewed = items.every(item => item.status !== 'pending');
-  const embed = embedWarning(`📋 قائمة الإنذارات — ${items.length} عضو`,
-    queueSummary(items));
+  const embed = embedWarn(`📋 قائمة الإنذارات — ${items.length} عضو`,
+    items.map((it, i) => `${i + 1}. ${it.gm} — إنذار (${it.nextNum})`).join('\n'));
 
-  const rows = [new ActionRowBuilder().addComponents(selectMenu)];
-  const actionRow = new ActionRowBuilder();
-  actionRow.addComponents(
-    new ButtonBuilder().setCustomId('pun_queue_approve_all').setLabel('✅ قبول الكل').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('pun_queue_reject_all').setLabel('❌ رفض الكل').setStyle(ButtonStyle.Danger),
-  );
-  rows.push(actionRow);
-  if (allReviewed) {
-    rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('pun_queue_submit').setLabel('📨 إرسال القرارات').setStyle(ButtonStyle.Primary),
-    ));
-  }
+  const rows = [new ActionRowBuilder().addComponents(sel)];
+  rows.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('pun_queue_warn_all').setLabel('⚠️ إنذار الكل').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel('🤝 مسامحة الكل').setStyle(ButtonStyle.Success),
+  ));
 
-  const msg = await logChannel.send({ embeds: [embed], components: rows });
-  activeQueues.set(msg.id, { items, channelId: logChannel.id, messageId: msg.id, guild });
+  const msg = await ch.send({ embeds: [embed], components: rows });
+  activeQueues.set(msg.id, { items, chId: ch.id, msgId: msg.id, guild });
 }
 
 /* ===================================================================
-   تحديث رسالة القائمة
+   تحديث القائمة
    =================================================================== */
-async function updateQueueMessage(queue) {
-  const logChannel = queue.guild.channels.cache.get(queue.channelId) || await queue.guild.channels.fetch(queue.channelId).catch(() => null);
-  if (!logChannel) return;
-  const msg = await logChannel.messages.fetch(queue.messageId).catch(() => null);
+async function updateQueue(q) {
+  const ch = q.guild.channels.cache.get(q.chId) || await q.guild.channels.fetch(q.chId).catch(() => null);
+  if (!ch) return;
+  const msg = await ch.messages.fetch(q.msgId).catch(() => null);
   if (!msg) return;
 
-  const allReviewed = queue.items.every(item => item.status !== 'pending');
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId('pun_queue_select')
-    .setPlaceholder('اختر عضواً لعرض التفاصيل')
-    .addOptions(queue.items.slice(0, 25).map((item, i) => ({
-      label: item.gm?.displayName || item.discordId,
-      description: `إنذار (${item.nextWarningNum}) | ${item.status === 'approved' ? '✅' : item.status === 'rejected' ? '❌' : '⏳'}`,
+  const sel = new StringSelectMenuBuilder()
+    .setCustomId('pun_queue_sel')
+    .setPlaceholder('اختر عضواً')
+    .addOptions(q.items.slice(0, 25).map((it, i) => ({
+      label: it.gm?.displayName || it.discordId,
+      description: `إنذار (${it.nextNum})`,
       value: `${i}`,
     })));
 
-  const embed = embedWarning(`📋 قائمة الإنذارات — ${queue.items.length} عضو`,
-    queueSummary(queue.items));
+  const embed = embedWarn(`📋 قائمة الإنذارات — ${q.items.length} عضو`,
+    q.items.map((it, i) => `${i + 1}. ${it.gm} — إنذار (${it.nextNum})`).join('\n'));
 
-  const rows = [new ActionRowBuilder().addComponents(selectMenu)];
-  const actionRow = new ActionRowBuilder();
-  actionRow.addComponents(
-    new ButtonBuilder().setCustomId('pun_queue_approve_all').setLabel('✅ قبول الكل').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('pun_queue_reject_all').setLabel('❌ رفض الكل').setStyle(ButtonStyle.Danger),
-  );
-  rows.push(actionRow);
-  if (allReviewed) {
+  const rows = [new ActionRowBuilder().addComponents(sel)];
+  if (q.items.length > 0) {
     rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('pun_queue_submit').setLabel('📨 إرسال القرارات').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('pun_queue_warn_all').setLabel('⚠️ إنذار الكل').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel('🤝 مسامحة الكل').setStyle(ButtonStyle.Success),
     ));
   }
 
   await msg.edit({ embeds: [embed], components: rows });
-}
-
-function queueSummary(items) {
-  return items.map((item, i) => {
-    const icon = item.status === 'approved' ? '✅' : item.status === 'rejected' ? '❌' : '⏳';
-    const statusText = item.status === 'approved' ? 'مقبول'
-      : item.status === 'rejected' ? `مرفوض (${item.reason || 'بدون سبب'})`
-      : 'بانتظار المراجعة';
-    return `${icon} ${i + 1}. ${item.gm} — إنذار (${item.nextWarningNum}) — ${statusText}`;
-  }).join('\n');
+  if (q.items.length === 0) activeQueues.delete(q.msgId);
 }
 
 /* ===================================================================
-   معالجة تفاعلات القائمة (أزرار + Select Menu)
+   معالجة التفاعلات
    =================================================================== */
 export async function handleQueueInteraction(interaction) {
-  const { customId, guild } = interaction;
+  const { customId } = interaction;
   if (!customId.startsWith('pun_queue_')) return false;
 
-  let queue = null;
-  let queueMsgId = null;
-  for (const [msgId, q] of activeQueues) {
-    if (q.messageId === msgId || (interaction.message && interaction.message.id === q.messageId)) {
-      queue = q;
-      queueMsgId = msgId;
-      break;
-    }
+  let q, qId;
+  for (const [id, qq] of activeQueues) {
+    if (qq.msgId === (interaction.message?.id || id)) { q = qq; qId = id; break; }
   }
-  if (!queue) {
-    return interaction.reply({ content: '❌ انتهت صلاحية الجلسة.', flags: MessageFlags.Ephemeral });
-  }
+  if (!q) return interaction.reply({ content: '❌ انتهت الجلسة.', flags: MessageFlags.Ephemeral });
 
-  // Select Menu — عرض تفاصيل العضو
-  if (interaction.isStringSelectMenu() && customId === 'pun_queue_select') {
-    const index = parseInt(interaction.values[0]);
-    const item = queue.items[index];
-    if (!item) return interaction.reply({ content: '❌ العضو غير موجود.', flags: MessageFlags.Ephemeral });
+  // Select — تفاصيل فردية
+  if (interaction.isStringSelectMenu() && customId === 'pun_queue_sel') {
+    const idx = parseInt(interaction.values[0]);
+    const it = q.items[idx];
+    if (!it) return interaction.reply({ content: '❌ العضو غير موجود.', flags: MessageFlags.Ephemeral });
 
-    const embed = embedInfo(`📋 تفاصيل ${item.gm?.displayName || item.discordId}`,
-      `${item.gm}\nالحالة: ${item.status === 'approved' ? '✅ مقبول' : item.status === 'rejected' ? `❌ مرفوض (${item.reason})` : '⏳ بانتظار المراجعة'}`)
+    const emb = embedInfo(`📋 ${it.gm?.displayName || it.discordId}`,
+      `${it.gm}\nإنذار (${it.nextNum}/3) | نقاط: ${it.dailyLog.points || 0} | مخالف: ${it.dailyLog.daysAsViolator || 0} يوم`)
       .addFields(
-        { name: '⚠️ الإنذار', value: `${item.nextWarningNum}/3`, inline: true },
-        { name: '📊 نقاط اليوم', value: `${item.dailyLog.points || 0}`, inline: true },
-        { name: '📅 أيام المخالفة', value: `${item.dailyLog.daysAsViolator || 0}`, inline: true },
+        { name: '⚠️ الإنذار', value: `${it.nextNum}/3`, inline: true },
+        { name: '📊 نقاط', value: `${it.dailyLog.points || 0}`, inline: true },
+        { name: '📅 أيام', value: `${it.dailyLog.daysAsViolator || 0}`, inline: true },
       );
 
-    const row = new ActionRowBuilder();
-    if (item.status !== 'approved') {
-      row.addComponents(new ButtonBuilder().setCustomId(`pun_queue_item_approve_${index}`).setLabel('✅ قبول').setStyle(ButtonStyle.Success));
-    }
-    if (item.status !== 'rejected') {
-      row.addComponents(new ButtonBuilder().setCustomId(`pun_queue_item_reject_${index}`).setLabel('❌ رفض').setStyle(ButtonStyle.Danger));
-    }
-    const components = row.components.length > 0 ? [row] : [];
-    await interaction.reply({ embeds: [embed], components, flags: MessageFlags.Ephemeral });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`pun_queue_warn_${idx}`).setLabel('⚠️ إنذار').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`pun_queue_forgive_${idx}`).setLabel('🤝 مسامحة').setStyle(ButtonStyle.Success),
+    );
+
+    await interaction.reply({ embeds: [emb], components: [row], flags: MessageFlags.Ephemeral });
     return true;
   }
 
-  // قبول الكل
-  if (interaction.isButton() && customId === 'pun_queue_approve_all') {
+  // إنذار الكل
+  if (interaction.isButton() && customId === 'pun_queue_warn_all') {
     await interaction.deferUpdate();
-    for (const item of queue.items) {
-      if (item.status === 'pending' || item.status === 'rejected') {
-        item.status = 'approved';
-        item.reason = '';
-      }
-    }
-    await updateQueueMessage(queue);
+    const items = [...q.items];
+    await executeBatchWarns(q.guild, items, interaction.user);
+    q.items = [];
+    await updateQueue(q);
+    await interaction.followUp({ content: `✅ تم إنذار ${items.length} عضو.`, flags: MessageFlags.Ephemeral });
     return true;
   }
 
-  // رفض الكل — يفتح مودال سبب واحد
-  if (interaction.isButton() && customId === 'pun_queue_reject_all') {
+  // مسامحة الكل
+  if (interaction.isButton() && customId === 'pun_queue_forgive_all') {
     const modal = new ModalBuilder()
-      .setCustomId('pun_queue_reject_all_modal')
-      .setTitle('❌ سبب الرفض للكل');
-
-    const reasonInput = new TextInputBuilder()
-      .setCustomId('pun_queue_reject_all_reason')
-      .setLabel('السبب')
-      .setStyle(TextInputStyle.Paragraph)
-      .setMinLength(1)
-      .setMaxLength(500)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+      .setCustomId('pun_queue_forgive_all_modal')
+      .setTitle('🤝 سبب المسامحة');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('forgive_all_reason').setLabel('السبب').setStyle(TextInputStyle.Paragraph).setMinLength(5).setMaxLength(500).setRequired(true)
+    ));
     await interaction.showModal(modal);
     return true;
   }
 
-  // قبول فردي
-  if (interaction.isButton() && customId.startsWith('pun_queue_item_approve_')) {
+  // إنذار فردي
+  if (interaction.isButton() && customId.startsWith('pun_queue_warn_')) {
     await interaction.deferUpdate();
-    const index = parseInt(customId.split('_').pop());
-    if (queue.items[index]) {
-      queue.items[index].status = 'approved';
-      queue.items[index].reason = '';
+    const idx = parseInt(customId.split('_').pop());
+    const it = q.items[idx];
+    if (it) {
+      await executeSingleWarn(q.guild, it, interaction.user);
+      q.items.splice(idx, 1);
+      await updateQueue(q);
     }
-    await updateQueueMessage(queue);
     return true;
   }
 
-  // رفض فردي
-  if (interaction.isButton() && customId.startsWith('pun_queue_item_reject_')) {
-    const index = parseInt(customId.split('_').pop());
+  // مسامحة فردية
+  if (interaction.isButton() && customId.startsWith('pun_queue_forgive_')) {
+    const idx = parseInt(customId.split('_').pop());
     const modal = new ModalBuilder()
-      .setCustomId(`pun_queue_reject_item_modal_${index}`)
-      .setTitle('❌ سبب الرفض');
-
-    const reasonInput = new TextInputBuilder()
-      .setCustomId('pun_queue_reject_item_reason')
-      .setLabel('السبب')
-      .setStyle(TextInputStyle.Paragraph)
-      .setMinLength(1)
-      .setMaxLength(500)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+      .setCustomId(`pun_queue_forgive_item_${qId}_${idx}`)
+      .setTitle('🤝 سبب المسامحة');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('forgive_item_reason').setLabel('السبب').setStyle(TextInputStyle.Paragraph).setMinLength(5).setMaxLength(500).setRequired(true)
+    ));
     await interaction.showModal(modal);
-    return true;
-  }
-
-  // إرسال القرارات
-  if (interaction.isButton() && customId === 'pun_queue_submit') {
-    await interaction.deferUpdate();
-    const approved = queue.items.filter(item => item.status === 'approved');
-    const rejected = queue.items.filter(item => item.status === 'rejected');
-
-    if (approved.length === 0) {
-      await interaction.followUp({ content: '❌ لا يوجد أعضاء مقبولين لإرسال القرارات.', flags: MessageFlags.Ephemeral });
-      return true;
-    }
-
-    await executeBatchWarnings(guild, approved, interaction.user);
-
-    activeQueues.delete(queueMsgId);
-
-    await interaction.followUp({
-      content: `✅ تم إصدار القرار لـ **${approved.length}** أعضاء.${rejected.length > 0 ? `\n❌ تم رفض **${rejected.length}** أعضاء.` : ''}`,
-      flags: MessageFlags.Ephemeral
-    });
     return true;
   }
 
@@ -294,155 +207,105 @@ export async function handleQueueInteraction(interaction) {
 }
 
 /* ===================================================================
-   معالجة مودالات الرفض
+   مودالات المسامحة
    =================================================================== */
 export async function handleQueueModal(interaction) {
-  const customId = interaction.customId;
+  const { customId } = interaction;
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  if (customId === 'pun_queue_reject_all_modal') {
-    const reason = interaction.fields.getTextInputValue('pun_queue_reject_all_reason');
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-    let queue = null;
-    for (const [, q] of activeQueues) {
-      if (q.messageId) { queue = q; break; }
-    }
-    if (!queue) return interaction.editReply({ content: '❌ انتهت صلاحية الجلسة.' });
-
-    for (const item of queue.items) {
-      if (item.status === 'pending' || item.status === 'approved') {
-        item.status = 'rejected';
-        item.reason = reason;
-      }
-    }
-    await updateQueueMessage(queue);
-    await interaction.editReply({ content: '✅ تم رفض جميع الأعضاء.' });
+  // مسامحة الكل
+  if (customId === 'pun_queue_forgive_all_modal') {
+    const reason = interaction.fields.getTextInputValue('forgive_all_reason');
+    let q;
+    for (const [, qq] of activeQueues) { q = qq; break; }
+    if (!q || q.items.length === 0) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
+    const count = q.items.length;
+    for (const it of q.items) await executeSingleForgive(q.guild, it, interaction.user.id, reason);
+    q.items = [];
+    await updateQueue(q);
+    await interaction.editReply({ content: `✅ تمت مسامحة ${count} عضو.` });
     return;
   }
 
-  if (customId.startsWith('pun_queue_reject_item_modal_')) {
-    const index = parseInt(customId.replace('pun_queue_reject_item_modal_', ''));
-    const reason = interaction.fields.getTextInputValue('pun_queue_reject_item_reason');
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-    let queue = null;
-    for (const [, q] of activeQueues) {
-      if (q.messageId) { queue = q; break; }
-    }
-    if (!queue || !queue.items[index]) return interaction.editReply({ content: '❌ انتهت صلاحية الجلسة.' });
-
-    queue.items[index].status = 'rejected';
-    queue.items[index].reason = reason;
-    await updateQueueMessage(queue);
-    await interaction.editReply({ content: '✅ تم رفض العضو.' });
+  // مسامحة فردية
+  if (customId.startsWith('pun_queue_forgive_item_')) {
+    const parts = customId.split('_');
+    const qMsgId = parts[3];
+    const idx = parseInt(parts[4]);
+    const reason = interaction.fields.getTextInputValue('forgive_item_reason');
+    const q = activeQueues.get(qMsgId);
+    if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
+    const it = q.items[idx];
+    await executeSingleForgive(q.guild, it, interaction.user.id, reason);
+    q.items.splice(idx, 1);
+    await updateQueue(q);
+    await interaction.editReply({ content: `✅ تمت مسامحة ${it.gm}.` });
     return;
   }
 }
 
 /* ===================================================================
-   تنفيذ الدفعة — تطبيق الإنذارات + إرسال قرار موحد + GIF
+   تنفيذ إنذار واحد (للمسح من القائمة)
    =================================================================== */
-async function executeBatchWarnings(guild, approvedList, executor) {
-  const applied = [];
-  const errors = [];
+async function executeSingleWarn(guild, item, executor) {
+  const warn = new Warn({
+    memberId: item.discordId, memberName: executor.tag,
+    warningType: 'inactivity', typeName: 'عدم تفاعل',
+    reason: 'عدم تفاعل مستمر (قرار من لجنة العقوبات)',
+    givenBy: executor.id, givenByName: executor.tag,
+    status: 'active', removed: false,
+  });
+  await warn.save();
 
-  for (const item of approvedList) {
-    try {
-      const warning = new Warning({
-        memberId: item.discordId,
-        memberName: executor.tag,
-        warningType: 'inactivity',
-        typeName: 'عدم تفاعل',
-        reason: 'عدم تفاعل مستمر (قرار جماعي من لجنة العقوبات)',
-        givenBy: executor.id,
-        givenByName: executor.tag,
-        status: 'active',
-        removed: false,
-      });
-      await warning.save();
-
-      const config = loadConfig();
-      const warningNum = item.nextWarningNum;
-      if (item.gm) {
-        let warningRoleId = config.warnings?.roles?.[warningNum.toString()];
-        const actualRoleId = warningRoleId?.id || warningRoleId;
-        if (actualRoleId) {
-          await item.gm.roles.add(actualRoleId).catch(e => console.error('Failed to add warning role:', e));
-        }
-      }
-
-      // تحديث DailyLog
-      const dailyLog = await ensureDailyLog(item.discordId);
-      if (dailyLog) {
-        dailyLog.warningCount = warningNum;
-        await dailyLog.save();
-      }
-
-      // تحديث الإيموجي
-      await updateRoomEmoji(guild, item.discordId, getStatusEmoji(STATUS.WARNED)).catch(() => {});
-
-      // إرسال DM
-      const user = await guild.client.users.fetch(item.discordId).catch(() => null);
-      if (user) {
-        const remaining = 3 - warningNum;
-        let msg = `🟤 **تم تسجيل إنذار بعدم التفاعل.**\nمعك الآن ${warningNum} من ٣ إنذارات.\n`;
-        if (remaining > 0) {
-          msg += `عند وصول ٣ إنذارات يصير العضو جاهزاً للفصل.\n🎫 توجه للتذاكر إذا كان عندك عذر.`;
-        } else {
-          msg += `⚠️ وصلت ٣ إنذارات — اللجنة مخولة بفصلك.`;
-        }
-        await user.send(msg).catch(() => {});
-      }
-
-      // تسجيل في سجل العقوبات
-      await logWarning(guild, {
-        target: `<@${item.discordId}>`,
-        mod: `<@${executor.id}>`,
-        reason: 'عدم تفاعل مستمر',
-        warningCount: warningNum,
-        totalWarnings: 3,
-      });
-
-      // تحديث _lastInteractionStatus
-      item.memberData._lastInteractionStatus = STATUS.WARNED;
-      await item.memberData.save().catch(() => {});
-
-      applied.push(item);
-    } catch (e) {
-      console.error(`[PunishmentQueue] Error executing warn for ${item.discordId}:`, e?.message);
-      errors.push(item.discordId);
-    }
-  }
-
-  // إرسال القرار الموحد + GIF
-  if (applied.length > 0) {
-    await sendBulkWarningDecision(guild, applied, executor);
-  }
-
-  if (errors.length > 0) {
-    console.error(`[PunishmentQueue] Failed to warn ${errors.length} members:`, errors.join(', '));
-  }
-}
-
-/* ===================================================================
-   إرسال القرار الموحد — GIF واحد + نص يمنشن كل المحذّرين
-   =================================================================== */
-async function sendBulkWarningDecision(guild, appliedList, executor) {
   const config = loadConfig();
-  const decisionChannelId = config.warnings?.channels?.warningDecision?.id || getInteractionConfig().channels.decisions;
-  const decisionChannel = decisionChannelId ? (guild.channels.cache.get(decisionChannelId) || await guild.channels.fetch(decisionChannelId).catch(() => null)) : null;
+  const num = item.nextNum;
+  if (item.gm) {
+    let roleId = config.warnings?.roles?.[num.toString()];
+    const actual = roleId?.id || roleId;
+    if (actual) await item.gm.roles.add(actual).catch(() => {});
+  }
+
+  const dl = await ensureDailyLog(item.discordId);
+  if (dl) { dl.warningCount = num; await dl.save(); }
+
+  await logWarning(guild, {
+    target: `<@${item.discordId}>`, mod: `<@${executor.id}>`,
+    reason: 'عدم تفاعل مستمر', warningCount: num, totalWarnings: 3,
+  });
+
+  const { updateRoomEmoji } = await import('./interactionSystem.js');
+  await updateRoomEmoji(guild, item.discordId, getStatusEmoji(STATUS.WARNED)).catch(() => {});
+
+  item.memberData._lastInteractionStatus = STATUS.WARNED;
+  await item.memberData.save().catch(() => {});
+
+  const user = await guild.client.users.fetch(item.discordId).catch(() => null);
+  if (user) {
+    const rem = 3 - num;
+    let m = `🟤 **تم تسجيل إنذار بعدم التفاعل.**\nمعك الآن ${num} من ٣ إنذارات.\n`;
+    m += rem > 0 ? `متبقي ${rem} إنذار.` : '⚠️ وصلت ٣ إنذارات — اللجنة مخولة بفصلك.';
+    await user.send(m).catch(() => {});
+  }
+}
+
+/* ===================================================================
+   تنفيذ دفعة إنذارات + إرسال قرار موحد + GIF
+   =================================================================== */
+async function executeBatchWarns(guild, items, executor) {
+  for (const it of items) await executeSingleWarn(guild, it, executor);
+
+  const config = loadConfig();
+  const chId = config.warnings?.channels?.warningDecision?.id || getInteractionConfig().channels.decisions;
+  const ch = chId ? (guild.channels.cache.get(chId) || await guild.channels.fetch(chId).catch(() => null)) : null;
   const basicRoleId = config.roles?.basic?.id || '';
+  if (!ch) return;
 
-  if (!decisionChannel) return;
+  await ch.send({ content: WARN_GIF }).catch(() => {});
 
-  // GIF واحد
-  await decisionChannel.send({ content: WARN_GIF }).catch(e => console.error('[PunishmentQueue] GIF send failed:', e?.message));
-
-  // القرار الموحد — نفس النص القديم لكن يمنشن الكل
-  const membersList = appliedList.map(item => `- <@${item.discordId}>`).join('\n');
-  const detailsList = appliedList.map(item => {
-    const numArabic = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس'][item.nextWarningNum - 1] || `${item.nextWarningNum}`;
-    return `> • **بإعطاء تحذير (${numArabic})** — <@${item.discordId}>`;
+  const membersList = items.map(it => `- <@${it.discordId}>`).join('\n');
+  const details = items.map(it => {
+    const arabic = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس'][it.nextNum - 1] || it.nextNum;
+    return `> • **بإعطاء تحذير (${arabic})** — <@${it.discordId}>`;
   }).join('\n');
 
   const decision = `
@@ -454,7 +317,7 @@ ${membersList}
 
 **السبب :**  || عدم تفاعل مستمر ||
 
-${detailsList}
+${details}
 
 -# ملاحظة : عند بلوغ 3 تحذيرات سيتم اتخاذ إجراء الفصل التلقائي.
 **تــوقــيــع مسؤول القرار ✍:** ${executor}
@@ -462,5 +325,29 @@ ${detailsList}
 ||<@&${basicRoleId}>||
 ▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
 
-  await decisionChannel.send({ content: decision }).catch(() => {});
+  await ch.send({ content: decision }).catch(() => {});
+}
+
+/* ===================================================================
+   تنفيذ مسامحة واحدة
+   =================================================================== */
+async function executeSingleForgive(guild, item, executorId, reason) {
+  const today = formatDate(new Date());
+  const dl = await DayLog.findOne({ discordId: item.discordId, date: today });
+  if (dl) {
+    dl.forgiven = true; dl.forgivenBy = executorId;
+    dl.forgivenReason = reason; dl.forgivenAt = new Date();
+    dl.daysAsViolator = 0;
+    await dl.save();
+  }
+
+  const wc = await Warn.countDocuments({ memberId: item.discordId, warningType: 'inactivity', status: 'active', removed: false });
+  await logForgive(guild, {
+    target: `<@${item.discordId}>`, mod: `<@${executorId}>`,
+    reason, warningCount: wc, totalWarnings: 3,
+  }).catch(() => {});
+
+  const { quickClassify, updateRoomEmoji } = await import('./interactionSystem.js');
+  const res = await quickClassify(item.discordId);
+  if (res?.emoji) await updateRoomEmoji(guild, item.discordId, res.emoji).catch(() => {});
 }

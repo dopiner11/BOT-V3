@@ -2032,7 +2032,7 @@ export async function assessMemberStatus(client, guild, discordId, { silentInit 
     else if (currentStatus === STATUS.INACTIVE) type = 'inactive';
     else type = 'active';
 
-    await sendDM(user, type, dailyPoints, violatorThreshold, activeThreshold, guild);
+    await sendStatusDM(user, type, dailyPoints, violatorThreshold, activeThreshold, guild);
   }
 
   result.member._lastInteractionStatus = currentStatus;
@@ -2118,7 +2118,7 @@ async function sendNotificationLog(guild, title, description, fields, embedType 
   await sendToChannel(channel, fn(title, description, fields));
 }
 
-async function sendDM(user, type, points, violatorThreshold, activeThreshold, guild) {
+async function sendStatusDM(user, type, points, violatorThreshold, activeThreshold, guild) {
   let embed, statusLabel, embedType;
   if (type === 'violator') {
     statusLabel = 'مخالف';

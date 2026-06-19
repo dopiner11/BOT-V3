@@ -575,3 +575,4 @@ async function setupBroadcastSystem(mainClient) {
 }
 
 client.login(config.bot.token);
+// test

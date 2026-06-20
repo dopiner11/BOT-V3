@@ -25,7 +25,7 @@ async function rebuildQueue(guild, qMsgId) {
   if (!guild || !qMsgId) return null;
   const chId = getInteractionConfig().channels.alert;
   const items = await buildWarningQueue(guild);
-  const q = { items, chId: chId || '0', msgId: qMsgId, guild };
+  const q = { items, chId: chId || '0', msgId: qMsgId, guild, log: [] };
   activeQueues.set(qMsgId, q);
   return q;
 }
@@ -110,7 +110,7 @@ export async function sendQueueMessage(guildOrInt, items) {
   ));
 
   const msg = await ch.send({ embeds: [embed], components: rows });
-  activeQueues.set(msg.id, { items, chId: ch.id, msgId: msg.id, guild });
+  activeQueues.set(msg.id, { items, chId: ch.id, msgId: msg.id, guild, log: [] });
 }
 
 /* ===================================================================
@@ -131,8 +131,15 @@ async function updateQueue(q) {
       value: `${i}`,
     })));
 
+  const logText = q.log.length > 0 ? '\n\n📋 **السجل:**\n' + q.log.map(e =>
+    `> ${e.icon} **${e.tag}** — ${e.action} ${e.by ? `بواسطة ${e.by}` : ''}`
+  ).join('\n') : '';
+
   const embed = embedWarn(`📋 قائمة الإنذارات — ${q.items.length} عضو`,
-    q.items.map((it, i) => `${i + 1}. ${it.gm} — إنذار (${it.nextNum})`).join('\n'));
+    (q.items.length > 0
+      ? q.items.map((it, i) => `${i + 1}. ${it.gm} — إنذار (${it.nextNum})`).join('\n')
+      : '✅ تمت معالجة جميع الأعضاء.')
+    + logText);
 
   const rows = [new ActionRowBuilder().addComponents(sel)];
   if (q.items.length > 0) {
@@ -143,7 +150,9 @@ async function updateQueue(q) {
   }
 
   await msg.edit({ embeds: [embed], components: rows });
-  if (q.items.length === 0) activeQueues.delete(q.msgId);
+  if (q.items.length === 0) {
+    activeQueues.delete(q.msgId);
+  }
 }
 
 /* ===================================================================
@@ -207,6 +216,7 @@ export async function handleQueueInteraction(interaction) {
     await interaction.deferUpdate();
     const items = [...q.items];
     await executeBatchWarns(q.guild, items, interaction.user);
+    items.forEach(it => q.log.push({ icon: '⚠️', tag: it.gm?.displayName || it.discordId, action: 'إنذار', by: interaction.user.tag }));
     q.items = [];
     await updateQueue(q);
     await interaction.followUp({ content: `✅ تم إنذار ${items.length} عضو.`, flags: MessageFlags.Ephemeral });
@@ -277,7 +287,10 @@ export async function handleQueueModal(interaction) {
     if (!q) q = await rebuildQueue(interaction.guild, qMsgId);
     if (!q || q.items.length === 0) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
     const count = q.items.length;
-    for (const it of q.items) await executeSingleForgive(q.guild, it, interaction.user.id, reason);
+    for (const it of q.items) {
+      await executeSingleForgive(q.guild, it, interaction.user.id, reason);
+      q.log.push({ icon: '🤝', tag: it.gm?.displayName || it.discordId, action: 'مسامحة', by: interaction.user.tag });
+    }
     q.items = [];
     await updateQueue(q);
     await interaction.editReply({ content: `✅ تمت مسامحة ${count} عضو.` });
@@ -296,6 +309,7 @@ export async function handleQueueModal(interaction) {
     if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
     const it = q.items[idx];
     await executeSingleWarn(q.guild, it, interaction.user);
+    q.log.push({ icon: '⚠️', tag: it.gm?.displayName || it.discordId, action: 'إنذار', by: interaction.user.tag });
     q.items.splice(idx, 1);
     await updateQueue(q);
     await sendSingleWarnDecision(q.guild, it, interaction.user);
@@ -315,6 +329,7 @@ export async function handleQueueModal(interaction) {
     if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
     const it = q.items[idx];
     await executeSingleForgive(q.guild, it, interaction.user.id, reason);
+    q.log.push({ icon: '🤝', tag: it.gm?.displayName || it.discordId, action: 'مسامحة', by: interaction.user.tag });
     q.items.splice(idx, 1);
     await updateQueue(q);
     await interaction.editReply({ content: `✅ تمت مسامحة ${it.gm}.` });

@@ -375,14 +375,41 @@ async function sendAutoSummary(guild, record) {
 
 /* ============== Exports ============== */
 
-async function initWorkflow(guild, client, ticketNumber, replyFn) {
+async function initWorkflow(guild, client, ticketNumber, replyFn, interaction) {
   const ticket = await Ticket.findOne({ ticketNumber: Number(ticketNumber) });
-  if (!ticket) { if (replyFn) await replyFn('❌ التذكرة غير موجودة!'); return; }
-  if (ticket.type !== 'application') { if (replyFn) await replyFn('❌ هذا النظام فقط لتذاكر التقديم!'); return; }
+  if (!ticket) { if (replyFn) await replyFn('❌ التذكرة غير موجودة!'); return false; }
+  if (ticket.type !== 'application') { if (replyFn) await replyFn('❌ هذا النظام فقط لتذاكر التقديم!'); return false; }
   console.log(`[Workflow] ticket #${ticketNumber} found, type=application, channel=${ticket.channelId}`);
 
   const existing = await ApplicationStage.findOne({ ticketNumber: Number(ticketNumber), status: 'active' });
-  if (existing) { if (replyFn) await replyFn('❌ المراحل شغالة بالفعل لهذه التذكرة!'); return; }
+  if (existing) {
+    // إذا كان المستخدم إدارة، نغلق المراحل القديمة ونبدأ من جديد
+    if (interaction) {
+      const cfg = loadConfig();
+      const committees = cfg.committees?.list || {};
+      const allRoles = [];
+      for (const key of Object.keys(committees)) {
+        const group = committees[key];
+        if (group?.roles) { for (const r of Object.values(group.roles)) if (Array.isArray(r)) allRoles.push(...r); }
+        else if (Array.isArray(group)) allRoles.push(...group);
+      }
+      const isAdmin = allRoles.some(r => r === interaction.member?.id || interaction.member?.roles?.cache?.has(r))
+        || interaction.member?.permissions?.has(PermissionFlagsBits.Administrator);
+      if (isAdmin) {
+        await ApplicationStage.updateMany(
+          { ticketNumber: Number(ticketNumber), status: 'active' },
+          { $set: { status: 'closed' } }
+        );
+        console.log(`[Workflow] تم إغلاق المراحل القديمة للتذكرة #${ticketNumber} وإعادة التشغيل`);
+      } else {
+        if (replyFn) await replyFn('❌ المراحل شغالة بالفعل لهذه التذكرة!');
+        return false;
+      }
+    } else {
+      if (replyFn) await replyFn('❌ المراحل شغالة بالفعل لهذه التذكرة!');
+      return false;
+    }
+  }
 
   const record = await getStageRecord(ticketNumber);
   record.stages[0].status = 'active';
@@ -401,7 +428,7 @@ async function initWorkflow(guild, client, ticketNumber, replyFn) {
 export async function autoStartWorkflow(guild, client, ticketNumber) {
   console.log(`[Workflow] autoStartWorkflow called for ticket #${ticketNumber}`);
   try {
-    await initWorkflow(guild, client, ticketNumber, null);
+    await initWorkflow(guild, client, ticketNumber, null, null);
   } catch (error) {
     console.error('❌ خطأ في البدء التلقائي:', error.message);
   }
@@ -411,10 +438,12 @@ export async function startWorkflow(interaction, ticketNumber) {
   console.log(`[Workflow] startWorkflow called for ticket #${ticketNumber}`);
   try {
     await interaction.deferUpdate();
-    await initWorkflow(interaction.guild, interaction.client, ticketNumber, async (msg) => {
+    const ok = await initWorkflow(interaction.guild, interaction.client, ticketNumber, async (msg) => {
       await interaction.followUp({ content: msg, flags: MessageFlags.Ephemeral });
-    });
-    await interaction.followUp({ content: '✅ تم بدء مراحل التقديم!', flags: MessageFlags.Ephemeral });
+    }, interaction);
+    if (ok) {
+      await interaction.followUp({ content: '✅ تم بدء مراحل التقديم!', flags: MessageFlags.Ephemeral });
+    }
     console.log(`[Workflow] startWorkflow completed for #${ticketNumber}`);
   } catch (error) {
     console.error('❌ خطأ في بدء المراحل:', error.message);

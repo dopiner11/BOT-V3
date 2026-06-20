@@ -148,8 +148,17 @@ export async function handleQueueInteraction(interaction) {
   }
 
   let q, qId;
-  for (const [id, qq] of activeQueues) {
-    if (qq.msgId === (interaction.message?.id || id)) { q = qq; qId = id; break; }
+  const parts = customId.split('_');
+  // الأزرار الفردية تحتوي qId مباشرة في الـ customId
+  if (parts.length >= 5) {
+    qId = parts[3] === 'item' ? parts[4] : parts[3];
+    q = activeQueues.get(qId);
+  }
+  // Fallback للأزرار على الرسالة الأصلية
+  if (!q) {
+    for (const [id, qq] of activeQueues) {
+      if (qq.msgId === (interaction.message?.id || id)) { q = qq; qId = id; break; }
+    }
   }
   if (!q) return interaction.reply({ content: '❌ انتهت الجلسة.', flags: MessageFlags.Ephemeral });
 
@@ -168,8 +177,8 @@ export async function handleQueueInteraction(interaction) {
       );
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`pun_queue_warn_${idx}`).setLabel('⚠️ إنذار').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(`pun_queue_forgive_${idx}`).setLabel('🤝 مسامحة').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`pun_queue_warn_${qId}_${idx}`).setLabel('⚠️ إنذار').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`pun_queue_forgive_${qId}_${idx}`).setLabel('🤝 مسامحة').setStyle(ButtonStyle.Success),
     );
 
     await interaction.reply({ embeds: [emb], components: [row], flags: MessageFlags.Ephemeral });
@@ -190,7 +199,7 @@ export async function handleQueueInteraction(interaction) {
   // مسامحة الكل
   if (interaction.isButton() && customId === 'pun_queue_forgive_all') {
     const modal = new ModalBuilder()
-      .setCustomId('pun_queue_forgive_all_modal')
+      .setCustomId(`pun_queue_forgive_all_modal_${qId}`)
       .setTitle('🤝 سبب المسامحة');
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('forgive_all_reason').setLabel('السبب').setStyle(TextInputStyle.Paragraph).setMinLength(5).setMaxLength(500).setRequired(true)
@@ -200,23 +209,27 @@ export async function handleQueueInteraction(interaction) {
   }
 
   // إنذار فردي
-  if (interaction.isButton() && customId.startsWith('pun_queue_warn_')) {
+  if (interaction.isButton() && customId.startsWith('pun_queue_warn_') && customId !== 'pun_queue_warn_all') {
     await interaction.deferUpdate();
-    const idx = parseInt(customId.split('_').pop());
-    const it = q.items[idx];
-    if (it) {
-      await executeSingleWarn(q.guild, it, interaction.user);
-      q.items.splice(idx, 1);
-      await updateQueue(q);
+    const parts = customId.split('_');
+    const qMsgId = parts[3];
+    const idx = parseInt(parts[4]);
+    const qq = activeQueues.get(qMsgId);
+    if (qq && qq.items[idx]) {
+      await executeSingleWarn(qq.guild, qq.items[idx], interaction.user);
+      qq.items.splice(idx, 1);
+      await updateQueue(qq);
     }
     return true;
   }
 
   // مسامحة فردية
-  if (interaction.isButton() && customId.startsWith('pun_queue_forgive_')) {
-    const idx = parseInt(customId.split('_').pop());
+  if (interaction.isButton() && customId.startsWith('pun_queue_forgive_') && customId !== 'pun_queue_forgive_all') {
+    const parts = customId.split('_');
+    const qMsgId = parts[3];
+    const idx = parseInt(parts[4]);
     const modal = new ModalBuilder()
-      .setCustomId(`pun_queue_forgive_item_${qId}_${idx}`)
+      .setCustomId(`pun_queue_forgive_item_${qMsgId}_${idx}`)
       .setTitle('🤝 سبب المسامحة');
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('forgive_item_reason').setLabel('السبب').setStyle(TextInputStyle.Paragraph).setMinLength(5).setMaxLength(500).setRequired(true)
@@ -240,10 +253,10 @@ export async function handleQueueModal(interaction) {
   }
 
   // مسامحة الكل
-  if (customId === 'pun_queue_forgive_all_modal') {
+  if (customId.startsWith('pun_queue_forgive_all_modal')) {
     const reason = interaction.fields.getTextInputValue('forgive_all_reason');
-    let q;
-    for (const [, qq] of activeQueues) { q = qq; break; }
+    const qMsgId = customId.split('_')[5];
+    const q = activeQueues.get(qMsgId);
     if (!q || q.items.length === 0) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
     const count = q.items.length;
     for (const it of q.items) await executeSingleForgive(q.guild, it, interaction.user.id, reason);
@@ -256,8 +269,9 @@ export async function handleQueueModal(interaction) {
   // مسامحة فردية
   if (customId.startsWith('pun_queue_forgive_item_')) {
     const parts = customId.split('_');
-    const qMsgId = parts[3];
-    const idx = parseInt(parts[4]);
+    // pun_queue_forgive_item_{qId}_{idx}
+    const qMsgId = parts[4];
+    const idx = parseInt(parts[5]);
     const reason = interaction.fields.getTextInputValue('forgive_item_reason');
     const q = activeQueues.get(qMsgId);
     if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });

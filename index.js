@@ -20,7 +20,6 @@ import { handleCommitteeInteraction, refreshAllCommitteePanels, checkCommandPerm
 
 import { startInteractionChecker } from './utils/interactionSystem.js';
 import { startCleanupScheduler } from './utils/cleanupExpired.js';
-import { startWebhookSystem } from './utils/webhookManager.js';
 import { startExcuseNotifications } from './commands/Excuse.js';
 import { startVoteExpiryChecker } from './utils/voteManager.js';
 import { setOvertakeGuild } from './utils/rankTracker.js';
@@ -144,9 +143,6 @@ client.once(Events.ClientReady, async () => {
   await refreshPresence(client);
   await ensureVoiceConnection(client);
 
-  const { initQuranPlayer } = await import('./utils/quranPlayer.js');
-  await initQuranPlayer(client);
-
   const { migrateExistingWorkflows } = await import('./utils/applicationWorkflow.js');
   await migrateExistingWorkflows(client);
 
@@ -175,7 +171,6 @@ client.once(Events.ClientReady, async () => {
       startInteractionChecker(client);
       if (mainGuild) setPointsManagerContext(client, mainGuild);
       startCleanupScheduler(client);
-      startWebhookSystem(client);
       const { startStatsHub } = await import('./utils/statsHub.js');
       startStatsHub(client).catch(e => console.error('[StatsHub] startup:', e?.message));
       setupBroadcastSystem(client);
@@ -456,10 +451,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (customId.startsWith('ch_delete_')) return await handleChallengeDelete(interaction);
       if (customId === 'ch_assign_all') return await handleChallengeAssignAll(interaction);
       if (customId === 'ch_clear_active') return await handleChallengeClearActive(interaction);
-
-      // ====== النظام العاشر: اللوبية التفاعلية ======
-      const { ALL_LB_BUTTONS, handleLeaderboardInteraction } = await import('./utils/interactiveLeaderboard.js');
-      if (ALL_LB_BUTTONS.has(customId)) return await handleLeaderboardInteraction(interaction);
 
       // ====== النظام الحادي عشر: التصويت ======
       if (customId.startsWith('vote_yes_') || customId.startsWith('vote_no_') || customId.startsWith('vote_voters_') || customId.startsWith('vote_reasons_')) {

@@ -90,8 +90,8 @@ export async function handleButtonInteraction(interaction) {
             return await addUserToTicket(interaction, customId.split('_').pop());
         }
         if (customId.startsWith('finish_application_')) {
-            const { startWorkflow } = await import('./applicationWorkflow.js');
-            return await startWorkflow(interaction, customId.split('_').pop());
+            const { finishApplication } = await import('./ticketManager.js');
+            return await finishApplication(interaction, customId.split('_').pop());
         }
         if (customId.startsWith('rename_ticket_app_')) {
             const { handleRenameTicketApp } = await import('./ticketManager.js');

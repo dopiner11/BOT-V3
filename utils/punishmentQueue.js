@@ -20,6 +20,16 @@ function loadConfig() {
 
 const activeQueues = new Map();
 
+// إعادة بناء القائمة من قاعدة البيانات (لما البوت يعيد تشغيل وتنمسح الذاكرة)
+async function rebuildQueue(guild, qMsgId) {
+  const chId = getInteractionConfig().channels.alert;
+  const items = await buildWarningQueue(guild);
+  if (items.length === 0) return null;
+  const q = { items, chId, msgId: qMsgId || 'rebuilt', guild };
+  if (qMsgId) activeQueues.set(qMsgId, q);
+  return q;
+}
+
 function hasQueuePermission(member) {
   const cfg = loadConfig();
   const pres = cfg.committees?.list?.family_presidency;
@@ -160,6 +170,15 @@ export async function handleQueueInteraction(interaction) {
       if (qq.msgId === (interaction.message?.id || id)) { q = qq; qId = id; break; }
     }
   }
+  // إذا القائمة انمسحت من الذاكرة (إعادة تشغيل البوت)، نبنيها من قاعدة البيانات
+  if (!q) {
+    const chId = getInteractionConfig().channels.alert;
+    if (interaction.channelId === chId) {
+      const qIdFromCustom = parts.length >= 5 ? (parts[3] === 'item' ? parts[4] : parts[3]) : null;
+      const msgId = qIdFromCustom || interaction.message?.id;
+      q = await rebuildQueue(interaction.guild, msgId);
+    }
+  }
   if (!q) return interaction.reply({ content: '❌ انتهت الجلسة.', flags: MessageFlags.Ephemeral });
 
   // Select — تفاصيل فردية
@@ -256,7 +275,8 @@ export async function handleQueueModal(interaction) {
   if (customId.startsWith('pun_queue_forgive_all_modal')) {
     const reason = interaction.fields.getTextInputValue('forgive_all_reason');
     const qMsgId = customId.split('_')[5];
-    const q = activeQueues.get(qMsgId);
+    let q = activeQueues.get(qMsgId);
+    if (!q) q = await rebuildQueue(interaction.guild, qMsgId);
     if (!q || q.items.length === 0) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
     const count = q.items.length;
     for (const it of q.items) await executeSingleForgive(q.guild, it, interaction.user.id, reason);
@@ -273,7 +293,8 @@ export async function handleQueueModal(interaction) {
     const qMsgId = parts[4];
     const idx = parseInt(parts[5]);
     const reason = interaction.fields.getTextInputValue('forgive_item_reason');
-    const q = activeQueues.get(qMsgId);
+    let q = activeQueues.get(qMsgId);
+    if (!q) q = await rebuildQueue(interaction.guild, qMsgId);
     if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
     const it = q.items[idx];
     await executeSingleForgive(q.guild, it, interaction.user.id, reason);

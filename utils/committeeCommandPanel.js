@@ -9,12 +9,7 @@ import { logWarning, logFire, logBlacklist, logBlacklistRemove, logPoints } from
 import { getInteractionConfig } from './interactionSystem.js';
 
 // Lazy-loaded imports (cached after first call)
-let _reportsCommand = null;
 let _WarningModel = null;
-async function getReportsCmd() {
-  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
-  return _reportsCommand;
-}
 async function getWarningModel() {
   if (!_WarningModel) _WarningModel = (await import('../models/Warning.js')).default;
   return _WarningModel;
@@ -645,7 +640,6 @@ async function handleWarningModal(interaction) {
 
   const Warning = await getWarningModel();
   const { updateRoomEmoji, STATUS } = await getIntManager();
-  const { updateReportsDashboard } = await getReportsCmd();
 
   const warning = new Warning({
     memberId: targetUserId,
@@ -758,7 +752,8 @@ async function handleWarningModal(interaction) {
     await updateRoomEmoji(interaction.guild, targetUserId);
   }
 
-  await updateReportsDashboard(interaction.client, false).catch(e => console.error('فشل تحديث التقرير:', e));
+  const { scheduleStatsUpdate } = await import('./statsHub.js');
+  scheduleStatsUpdate(interaction.client).catch(e => console.error('فشل تحديث الإحصائيات:', e));
 
   await interaction.editReply({ content: `✅ تم إصدار التحذير رقم **${warningNum}** لـ ${targetUser} بنجاح.` });
 }

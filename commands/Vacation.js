@@ -3,7 +3,7 @@ import Vacation from '../models/Vacation.js';
 import Member from '../models/Member.js';
 import { createGracePeriod } from '../utils/interactionMonitor.js';
 import { updateMemberRoomEmoji } from '../utils/roomStatusUpdater.js';
-import { updateReportsDashboard } from './reports.js';
+import { scheduleStatsUpdate } from '../utils/statsHub.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -133,8 +133,8 @@ export default {
       // تحديث ايموجي الروم إلى ⚫
       await updateMemberRoomEmoji(interaction.guild, targetUser.id);
 
-      // تحديث لوحة التقارير فوراً
-      await updateReportsDashboard(interaction.client, false).catch(e => console.error('فشل تحديث التقرير:', e));
+      // تحديث مركز الإحصائيات فوراً
+      scheduleStatsUpdate(interaction.client).catch(e => console.error('فشل تحديث الإحصائيات:', e));
 
       // سحب الرتب وإعطاء رتبة الإجازة
       if (discordMember) {

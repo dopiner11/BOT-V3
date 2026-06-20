@@ -5,7 +5,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { updateRoomEmoji, STATUS, getInteractionConfig } from '../utils/interactionMonitor.js';
-import { updateReportsDashboard } from './reports.js';
+import { scheduleStatsUpdate } from '../utils/statsHub.js';
 import { warning as embedWarning, error as embedError, success as embedSuccess } from '../utils/embedStyles.js';
 import { dmUser } from '../utils/notificationSystem.js';
 import { logWarning } from '../utils/logSystem.js';
@@ -182,8 +182,8 @@ export default {
         await this.sendDecision(interaction, config, createdList, reason, type);
       }
 
-      // تحديث لوحة التقارير
-      await updateReportsDashboard(interaction.client, false).catch(e => console.error('فشل تحديث التقرير:', e));
+      // تحديث مركز الإحصائيات
+      scheduleStatsUpdate(interaction.client).catch(e => console.error('فشل تحديث الإحصائيات:', e));
 
       // رسالة النتيجة
       const resultLines = [];

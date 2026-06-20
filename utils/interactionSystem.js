@@ -177,7 +177,7 @@ export const STATUS_EMOJI = new Proxy({}, {
 // Lazy imports (cached after first call)
 let _embedStyles = null;
 let _notificationSystem = null;
-let _reportsCommand = null;
+let _statsHub = null;
 
 async function getEmbedStyles() {
   if (!_embedStyles) _embedStyles = await import('./embedStyles.js');
@@ -187,9 +187,9 @@ async function getNotificationSystem() {
   if (!_notificationSystem) _notificationSystem = await import('./notificationSystem.js');
   return _notificationSystem;
 }
-async function getReportsCommand() {
-  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
-  return _reportsCommand;
+async function getStatsHub() {
+  if (!_statsHub) _statsHub = await import('./statsHub.js');
+  return _statsHub;
 }
 
 const NOTIFICATION_TYPES = {
@@ -546,8 +546,8 @@ export async function processAllMembers(client) {
     console.error('[InteractionSystem] Queue build error:', e?.message);
   }
 
-  const reportsCmd = await getReportsCommand();
-  reportsCmd.scheduleReportsDashboardUpdate(client, 3000);
+  const { scheduleStatsUpdate } = await getStatsHub();
+  scheduleStatsUpdate(client, 3000);
 
   return { processed, statusCounts };
 }
@@ -935,12 +935,12 @@ async function executePunishWarning(interaction, discordId, originalMessage = nu
     console.error('Failed to update room emoji:', err);
   }
 
-  // تحديث لوحة التقارير (مع debounce — 3 ثواني)
+  // تحديث مركز الإحصائيات (مع debounce — 3 ثواني)
   try {
-    const reportsCmd = await getReportsCommand();
-    reportsCmd.scheduleReportsDashboardUpdate(interaction.client, 3000);
+    const { scheduleStatsUpdate } = await getStatsHub();
+    scheduleStatsUpdate(interaction.client, 3000);
   } catch (err) {
-    console.error('Failed to schedule reports dashboard update:', err);
+    console.error('Failed to schedule stats hub update:', err);
   }
 
   // تحديث رسالة لجنة العقوبات الأصلية وإزالة الأزرار
@@ -1133,12 +1133,12 @@ ${extraInfo}
     console.error('Failed to update room emoji:', err);
   }
 
-  // تحديث لوحة التقارير (مع debounce — 3 ثواني)
+  // تحديث مركز الإحصائيات (مع debounce — 3 ثواني)
   try {
-    const reportsCmd = await getReportsCommand();
-    reportsCmd.scheduleReportsDashboardUpdate(interaction.client, 3000);
+    const { scheduleStatsUpdate } = await getStatsHub();
+    scheduleStatsUpdate(interaction.client, 3000);
   } catch (err) {
-    console.error('Failed to schedule reports dashboard update:', err);
+    console.error('Failed to schedule stats hub update:', err);
   }
 
   // Update committee notification

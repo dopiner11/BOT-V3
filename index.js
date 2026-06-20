@@ -14,10 +14,10 @@ import {
   handleModalAction, updateAttendancePanel,
   handleMyStats, handleAttendanceDoublePoints,
   cleanupStaleSessions,
-  handleVoiceStateUpdate, startAttendanceDashboard
+  handleVoiceStateUpdate
 } from './utils/attendanceHandler.js';
 import { handleCommitteeInteraction, refreshAllCommitteePanels, checkCommandPermission, checkButtonPermission } from './utils/committeeHandler.js';
-import { startStatusUpdates } from './utils/statusHandler.js';
+
 import { startInteractionChecker } from './utils/interactionSystem.js';
 import { startCleanupScheduler } from './utils/cleanupExpired.js';
 import { startWebhookSystem } from './utils/webhookManager.js';
@@ -133,7 +133,6 @@ for (const file of commandFiles) {
   }
 }
 
-import { startBMStatsSystem } from './commands/bmStats.js';
 import { setSenderClient, cancelBroadcast, SendJob, queue } from './utils/broadcastSender.js';
 import { success as embedSuccess } from './utils/embedStyles.js';
 import { startWatcher as startSchedulerWatcher } from './commands/announcement.js';
@@ -173,14 +172,12 @@ client.once(Events.ClientReady, async () => {
     try {
       console.log('🔄 Starting delayed system restorations...');
       await refreshAllCommitteePanels(client).catch(e => { });
-      await startBMStatsSystem(client).catch(e => { console.error('BM Stats error:', e); });
       startInteractionChecker(client);
       if (mainGuild) setPointsManagerContext(client, mainGuild);
-      startStatusUpdates(client);
       startCleanupScheduler(client);
       startWebhookSystem(client);
-      const { startReportSystem } = await import('./commands/reports.js');
-      startReportSystem(client).catch(e => console.error('[Reports] startup:', e?.message));
+      const { startStatsHub } = await import('./utils/statsHub.js');
+      startStatsHub(client).catch(e => console.error('[StatsHub] startup:', e?.message));
       setupBroadcastSystem(client);
       startSchedulerWatcher(client);
       startExcuseNotifications(client);
@@ -197,7 +194,6 @@ client.once(Events.ClientReady, async () => {
 
       await cleanupStaleSessions(guild).catch(e => console.error('[Index] cleanupStaleSessions:', e?.message));
       await updateAttendancePanel(guild).catch(e => console.error('[Index] updateAttendancePanel:', e?.message));
-      startAttendanceDashboard(client).catch(e => console.error('[Index] startAttendanceDashboard:', e?.message));
       deployGuideToAllMembers(client).catch(e => console.error('[Index] deployGuide:', e?.message));
       initActiveScenarios(client).catch(e => console.error('[Index] scenarios:', e?.message));
       console.log('✅ Systems restored.');
@@ -330,6 +326,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (customId.startsWith('pun_queue_')) {
         const { handleQueueInteraction } = await import('./utils/punishmentQueue.js');
         return await handleQueueInteraction(interaction);
+      }
+
+      // أزرار مركز الإحصائيات
+      if (customId.startsWith('stats_')) {
+        const { handleStatsInteraction } = await import('./utils/statsHub.js');
+        return await handleStatsInteraction(interaction);
       }
 
       // أزرار مشغل القرآن (عامة للجميع)

@@ -28,15 +28,10 @@ const REPORT_TEMP_DIR = join(__dirname, '../.data/report-temp');
 if (!existsSync(REPORT_TEMP_DIR)) mkdirSync(REPORT_TEMP_DIR, { recursive: true });
 
 // Lazy-loaded imports (cached after first call)
-let _reportsCommand = null;
 let _MemberModel = null;
 let _ReportModel = null;
 let _DoublePointsModel = null;
 let _PointLogModel = null;
-async function getReportsCmd() {
-  if (!_reportsCommand) _reportsCommand = await import('../commands/reports.js');
-  return _reportsCommand;
-}
 async function getMemberModel() {
   if (!_MemberModel) _MemberModel = (await import('../models/Member.js')).default;
   return _MemberModel;
@@ -962,8 +957,8 @@ async function handleReportAcceptance(interaction) {
 
   const awardResults = await awardPoints(interaction, report);
   await sendReportToLogChannel(interaction, report, awardResults);
-  const reportsCmd = await getReportsCmd();
-  reportsCmd.scheduleReportsDashboardUpdate(interaction.client);
+  const { scheduleStatsUpdate } = await import('./statsHub.js');
+  scheduleStatsUpdate(interaction.client);
 }
 
 async function awardPoints(interaction, report) {

@@ -10,7 +10,6 @@ import PersistentMessage from '../models/PersistentMessage.js';
 import DailyLog from '../models/DailyLog.js';
 import Grace24h from '../models/Grace24h.js';
 import Warning from '../models/Warning.js';
-import Attendance from '../models/Attendance.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -98,7 +97,7 @@ async function loadStatsData() {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const graceDate = new Date(now.getTime() - getInteractionConfig().graceDays * 24 * 60 * 60 * 1000);
 
-  const [members, activeVacations, activeExcuses, activeGrace, warnings, activeWarnings, dailyPoints, weeklyPoints, attendance] = await Promise.all([
+  const [members, activeVacations, activeExcuses, activeGrace, warnings, activeWarnings, dailyPoints, weeklyPoints] = await Promise.all([
     Member.find({ isActive: true }),
     Vacation.find({ status: 'active', endDate: { $gte: now } }),
     Excuse.find({ isActive: true, type: { $ne: 'تغير اسم' }, endDate: { $gte: now } }),
@@ -107,7 +106,6 @@ async function loadStatsData() {
     Warning.find({ removed: false }),
     PointLog.aggregate([{ $match: { createdAt: { $gte: midnight } } }, { $group: { _id: '$discordId', total: { $sum: '$points' } } }]),
     PointLog.aggregate([{ $match: { createdAt: { $gte: weekAgo } } }, { $group: { _id: '$discordId', total: { $sum: '$points' } } }]),
-    Attendance.find({}),
   ]);
 
   const newMembers = await Member.find({ createdAt: { $gte: graceDate } });
@@ -123,11 +121,6 @@ async function loadStatsData() {
   const warningsMap = new Map();
   for (const w of activeWarnings) {
     warningsMap.set(w.memberId, (warningsMap.get(w.memberId) || 0) + 1);
-  }
-
-  const attMap = new Map();
-  for (const a of attendance) {
-    attMap.set(a.userId, { totalPoints: a.totalPoints || 0, totalHours: a.totalHours || 0 });
   }
 
   const { violatorThreshold, inactiveThreshold } = getInteractionConfig();
@@ -157,8 +150,6 @@ async function loadStatsData() {
       warningCount: warningsMap.get(did) || 0,
       vacation: vacMap.get(did),
       excuse: excMap.get(did),
-      attendancePts: attMap.get(did)?.totalPoints || 0,
-      attendanceHrs: attMap.get(did)?.totalHours || 0,
     });
   }
 
@@ -192,11 +183,10 @@ const TABS = {
   summary: { label: '📊 الملخص', color: 0x2B2D31, emoji: '📊' },
   members: { label: '🔍 التصنيفات', color: 0x3498DB, emoji: '🔍' },
   top: { label: '🏆 التوب', color: 0xFFD700, emoji: '🏆' },
-  attendance: { label: '🏴‍☠️ الاحتلال', color: 0x5865F2, emoji: '🏴' },
   ranks: { label: '⚙️ التراتيب', color: 0x9B59B6, emoji: '⚙️' },
 };
 
-const TAB_ORDER = ['summary', 'members', 'top', 'attendance', 'ranks'];
+const TAB_ORDER = ['summary', 'members', 'top', 'ranks'];
 
 function baseEmbed(tab) {
   const t = TABS[tab] || TABS.summary;
@@ -344,38 +334,6 @@ function buildTopEmbed(data, page = 1) {
     .setFooter({ text: `🕐 آخر تحديث • الصفحة ${page}/2` });
 
   return { embed, totalPages: 2 };
-}
-
-/* ---------- Attendance ---------- */
-function buildAttendanceEmbed(data, page = 1) {
-  const sorted = [...data.classified].filter(c => c.attendancePts > 0 || c.attendanceHrs > 0)
-    .sort((a, b) => b.attendancePts - a.attendancePts);
-
-  if (sorted.length === 0) {
-    const embed = baseEmbed('attendance').setTitle('🏴‍☠️ إحصائيات الاحتلال').setDescription('*لا توجد بيانات احتلال*');
-    return { embed, totalPages: 1 };
-  }
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
-  const safePage = Math.max(1, Math.min(page, totalPages));
-  const start = (safePage - 1) * PER_PAGE;
-  const slice = sorted.slice(start, start + PER_PAGE);
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-
-  let desc = '';
-  for (let i = 0; i < slice.length; i++) {
-    const m = slice[i];
-    const rank = start + i + 1;
-    const medal = medals[rank - 1] || `\`#${rank}\``;
-    desc += `${medal} <@${m.discordId}> — **${m.attendancePts}** نقطة | ${m.attendanceHrs} ساعة\n`;
-  }
-
-  const embed = baseEmbed('attendance')
-    .setTitle('🏴‍☠️ إحصائيات الاحتلال')
-    .setDescription(desc)
-    .setFooter({ text: `🕐 آخر تحديث • الصفحة ${safePage}/${totalPages} • ${sorted.length} عضو` });
-
-  return { embed, totalPages };
 }
 
 /* ---------- Ranks ---------- */
@@ -529,7 +487,6 @@ async function buildTabContent(tab, rawData, page) {
     case 'summary': return buildSummaryEmbed(rawData);
     case 'members': return buildMembersEmbed(rawData, page);
     case 'top': return buildTopEmbed(rawData, page);
-    case 'attendance': return buildAttendanceEmbed(rawData, page);
     case 'ranks': return buildRanksEmbed(rawData, page);
     default: return buildSummaryEmbed(rawData);
   }

@@ -460,7 +460,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // ====== النظام الثاني عشر: أزرار دليل الترحيب ======
       if (customId.startsWith('guide_')) return await handleGuideButton(interaction);
 
-      // ====== النظام الثالث عشر: Fallback ======
+      // ====== النظام الثالث عشر: أزرار اللوبية التفاعلية (ملغية) ======
+      if (customId.startsWith('lb_')) {
+        return interaction.reply({ content: '❌ تم إلغاء نظام التوب واستبداله بمركز الإحصائيات.', flags: MessageFlags.Ephemeral });
+      }
+
+      // ====== النظام الرابع عشر: Fallback ======
       return await handleButtonInteraction(interaction);
     }
 

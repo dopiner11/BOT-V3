@@ -175,6 +175,7 @@ export async function handleQueueInteraction(interaction) {
     const qIdFromCustom = parts.length >= 5 ? (parts[3] === 'item' ? parts[4] : parts[3]) : null;
     const msgId = qIdFromCustom || interaction.message?.id;
     q = await rebuildQueue(interaction.guild, msgId);
+    if (q) qId = msgId;
   }
   if (!q) return interaction.reply({ content: '❌ انتهت الجلسة.', flags: MessageFlags.Ephemeral });
 
@@ -226,16 +227,16 @@ export async function handleQueueInteraction(interaction) {
 
   // إنذار فردي
   if (interaction.isButton() && customId.startsWith('pun_queue_warn_') && customId !== 'pun_queue_warn_all') {
-    await interaction.deferUpdate();
     const parts = customId.split('_');
     const qMsgId = parts[3];
     const idx = parseInt(parts[4]);
-    const qq = activeQueues.get(qMsgId);
-    if (qq && qq.items[idx]) {
-      await executeSingleWarn(qq.guild, qq.items[idx], interaction.user);
-      qq.items.splice(idx, 1);
-      await updateQueue(qq);
-    }
+    const modal = new ModalBuilder()
+      .setCustomId(`pun_queue_warn_item_${qMsgId}_${idx}`)
+      .setTitle('⚠️ تأكيد الإنذار');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('warn_item_reason').setLabel('السبب (اختياري)').setStyle(TextInputStyle.Paragraph).setMaxLength(500).setRequired(false)
+    ));
+    await interaction.showModal(modal);
     return true;
   }
 
@@ -280,6 +281,25 @@ export async function handleQueueModal(interaction) {
     q.items = [];
     await updateQueue(q);
     await interaction.editReply({ content: `✅ تمت مسامحة ${count} عضو.` });
+    return;
+  }
+
+  // إنذار فردي
+  if (customId.startsWith('pun_queue_warn_item_')) {
+    const parts = customId.split('_');
+    // pun_queue_warn_item_{qId}_{idx}
+    const qMsgId = parts[4];
+    const idx = parseInt(parts[5]);
+    const reason = interaction.fields.getTextInputValue('warn_item_reason') || 'عدم تفاعل مستمر';
+    let q = activeQueues.get(qMsgId);
+    if (!q) q = await rebuildQueue(interaction.guild, qMsgId);
+    if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
+    const it = q.items[idx];
+    await executeSingleWarn(q.guild, it, interaction.user);
+    q.items.splice(idx, 1);
+    await updateQueue(q);
+    await sendSingleWarnDecision(q.guild, it, interaction.user);
+    await interaction.editReply({ content: `✅ تم إنذار ${it.gm}.` });
     return;
   }
 
@@ -344,6 +364,39 @@ async function executeSingleWarn(guild, item, executor) {
     m += rem > 0 ? `متبقي ${rem} إنذار.` : '⚠️ وصلت ٣ إنذارات — اللجنة مخولة بفصلك.';
     await user.send(m).catch(() => {});
   }
+}
+
+/* ===================================================================
+   إرسال قرار إنذار فردي + GIF
+   =================================================================== */
+async function sendSingleWarnDecision(guild, item, executor) {
+  const config = loadConfig();
+  const chId = config.warnings?.channels?.warningDecision?.id || getInteractionConfig().channels.decisions;
+  const ch = chId ? (guild.channels.cache.get(chId) || await guild.channels.fetch(chId).catch(() => null)) : null;
+  const basicRoleId = config.roles?.basic?.id || '';
+  if (!ch) return;
+
+  await ch.send({ content: WARN_GIF }).catch(() => {});
+
+  const arabic = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس'][item.nextNum - 1] || item.nextNum;
+  const decision = `
+▬▬▬ ﷽ ▬▬▬
+<:Family:1516647836744417320> **قرار إداري صادر من قيادة العائلة** 𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 
+
+**لكلاً من :**  
+- <@${item.discordId}>
+
+**السبب :**  || عدم تفاعل مستمر ||
+
+> • **بإعطاء تحذير (${arabic})** — <@${item.discordId}>
+
+-# ملاحظة : عند بلوغ 3 تحذيرات سيتم اتخاذ إجراء الفصل التلقائي.
+**تــوقــيــع مسؤول القرار ✍:** ${executor}
+
+||<@&${basicRoleId}>||
+▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
+
+  await ch.send({ content: decision }).catch(() => {});
 }
 
 /* ===================================================================

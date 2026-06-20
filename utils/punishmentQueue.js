@@ -22,11 +22,11 @@ const activeQueues = new Map();
 
 // إعادة بناء القائمة من قاعدة البيانات (لما البوت يعيد تشغيل وتنمسح الذاكرة)
 async function rebuildQueue(guild, qMsgId) {
+  if (!guild || !qMsgId) return null;
   const chId = getInteractionConfig().channels.alert;
   const items = await buildWarningQueue(guild);
-  if (items.length === 0) return null;
-  const q = { items, chId, msgId: qMsgId || 'rebuilt', guild };
-  if (qMsgId) activeQueues.set(qMsgId, q);
+  const q = { items, chId: chId || '0', msgId: qMsgId, guild };
+  activeQueues.set(qMsgId, q);
   return q;
 }
 
@@ -172,12 +172,9 @@ export async function handleQueueInteraction(interaction) {
   }
   // إذا القائمة انمسحت من الذاكرة (إعادة تشغيل البوت)، نبنيها من قاعدة البيانات
   if (!q) {
-    const chId = getInteractionConfig().channels.alert;
-    if (interaction.channelId === chId) {
-      const qIdFromCustom = parts.length >= 5 ? (parts[3] === 'item' ? parts[4] : parts[3]) : null;
-      const msgId = qIdFromCustom || interaction.message?.id;
-      q = await rebuildQueue(interaction.guild, msgId);
-    }
+    const qIdFromCustom = parts.length >= 5 ? (parts[3] === 'item' ? parts[4] : parts[3]) : null;
+    const msgId = qIdFromCustom || interaction.message?.id;
+    q = await rebuildQueue(interaction.guild, msgId);
   }
   if (!q) return interaction.reply({ content: '❌ انتهت الجلسة.', flags: MessageFlags.Ephemeral });
 

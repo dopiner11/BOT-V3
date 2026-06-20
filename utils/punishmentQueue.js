@@ -261,11 +261,11 @@ export async function handleQueueInteraction(interaction) {
     for (const idx of indices) {
       if (idx >= 0 && idx < q.items.length && !q.pendingWarns.includes(idx) && isActionable(q, idx)) {
         q.pendingWarns.push(idx);
-        // لو كان مسامح سابقاً، نرجعه
         q.forgiven = q.forgiven.filter(f => f !== idx);
         moved++;
       }
     }
+    console.log(`[PunishmentQueue] Warn selected: ${moved} moved to pendingWarns, total pending: ${q.pendingWarns.length}`);
     await updateQueue(q);
     await interaction.followUp({ content: `✅ تمت إضافة ${moved} عضو لقائمة الإنذار المعلق.`, flags: MessageFlags.Ephemeral });
     return true;
@@ -376,7 +376,12 @@ async function executeSingleWarn(guild, item, executor) {
     givenBy: executor.id, givenByName: executor.tag,
     status: 'active', removed: false,
   });
-  await warn.save();
+  try {
+    await warn.save();
+    console.log(`[PunishmentQueue] ✅ Warning saved for ${item.discordId}, ID: ${warn._id}`);
+  } catch (e) {
+    console.error(`[PunishmentQueue] ❌ Failed to save warning for ${item.discordId}:`, e);
+  }
 
   const config = loadConfig();
   const num = item.nextNum;
@@ -446,6 +451,7 @@ async function sendSingleWarnDecision(guild, item, executor) {
    تنفيذ دفعة إنذارات + إرسال قرار موحد + GIF
    =================================================================== */
 async function executeBatchWarns(guild, items, executor) {
+  console.log(`[PunishmentQueue] executeBatchWarns: ${items.length} members for ${executor.tag}`);
   for (const it of items) await executeSingleWarn(guild, it, executor);
 
   const config = loadConfig();

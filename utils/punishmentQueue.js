@@ -19,13 +19,14 @@ function loadConfig() {
 }
 
 const activeQueues = new Map();
+const lastSelections = new Map(); // key: `${userId}_${qMsgId}`, value: [indices]
 
 // إعادة بناء القائمة من قاعدة البيانات (لما البوت يعيد تشغيل وتنمسح الذاكرة)
 async function rebuildQueue(guild, qMsgId) {
   if (!guild || !qMsgId) return null;
   const chId = getInteractionConfig().channels.alert;
   const items = await buildWarningQueue(guild);
-  const q = { items, chId: chId || '0', msgId: qMsgId, guild, log: [] };
+  const q = { items, pendingWarns: [], chId: chId || '0', msgId: qMsgId, guild, log: [] };
   activeQueues.set(qMsgId, q);
   return q;
 }
@@ -91,9 +92,12 @@ export async function sendQueueMessage(guildOrInt, items) {
   const ch = chId ? (guild.channels.cache.get(chId) || await guild.channels.fetch(chId).catch(() => null)) : null;
   if (!ch || items.length === 0) return;
 
+  const max = items.length;
   const sel = new StringSelectMenuBuilder()
     .setCustomId('pun_queue_sel')
-    .setPlaceholder('اختر عضواً')
+    .setPlaceholder('اختر الأعضاء')
+    .setMinValues(1)
+    .setMaxValues(max)
     .addOptions(items.slice(0, 25).map((it, i) => ({
       label: it.gm?.displayName || it.discordId,
       description: `إنذار (${it.nextNum})`,
@@ -105,12 +109,11 @@ export async function sendQueueMessage(guildOrInt, items) {
 
   const rows = [new ActionRowBuilder().addComponents(sel)];
   rows.push(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('pun_queue_warn_all').setLabel('⚠️ إنذار الكل').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel('🤝 مسامحة الكل').setStyle(ButtonStyle.Success),
   ));
 
   const msg = await ch.send({ embeds: [embed], components: rows });
-  activeQueues.set(msg.id, { items, chId: ch.id, msgId: msg.id, guild, log: [] });
+  activeQueues.set(msg.id, { items, pendingWarns: [], chId: ch.id, msgId: msg.id, guild, log: [] });
 }
 
 /* ===================================================================
@@ -122,37 +125,57 @@ async function updateQueue(q) {
   const msg = await ch.messages.fetch(q.msgId).catch(() => null);
   if (!msg) return;
 
+  const remaining = q.items.filter((_, i) => !q.pendingWarns.includes(i));
+  const pendingIdx = q.items.filter((_, i) => q.pendingWarns.includes(i));
+  const total = q.items.length;
+
+  const max = total;
   const sel = new StringSelectMenuBuilder()
     .setCustomId('pun_queue_sel')
-    .setPlaceholder('اختر عضواً')
+    .setPlaceholder('اختر الأعضاء')
+    .setMinValues(1)
+    .setMaxValues(max)
     .addOptions(q.items.slice(0, 25).map((it, i) => ({
       label: it.gm?.displayName || it.discordId,
-      description: `إنذار (${it.nextNum})`,
+      description: q.pendingWarns.includes(i) ? `⏳ بانتظار الإنذار` : `إنذار (${it.nextNum})`,
       value: `${i}`,
     })));
 
-  const logText = q.log.length > 0 ? '\n\n📋 **السجل:**\n' + q.log.map(e =>
-    `> ${e.icon} **${e.tag}** — ${e.action} ${e.by ? `بواسطة ${e.by}` : ''}`
-  ).join('\n') : '';
+  let desc = '';
+  if (total > 0) {
+    desc += '**📋 باقي:**\n' + q.items.map((it, i) =>
+      q.pendingWarns.includes(i)
+        ? `⏳ ${i + 1}. ${it.gm} — إنذار (${it.nextNum}) [معلق]`
+        : `${i + 1}. ${it.gm} — إنذار (${it.nextNum})`
+    ).join('\n');
+  } else {
+    desc = '✅ تمت معالجة جميع الأعضاء.';
+  }
 
-  const embed = embedWarn(`📋 قائمة الإنذارات — ${q.items.length} عضو`,
-    (q.items.length > 0
-      ? q.items.map((it, i) => `${i + 1}. ${it.gm} — إنذار (${it.nextNum})`).join('\n')
-      : '✅ تمت معالجة جميع الأعضاء.')
-    + logText);
+  if (q.log.length > 0) {
+    desc += '\n\n**📋 السجل:**\n' + q.log.map(e =>
+      `> ${e.icon} **${e.tag}** — ${e.action} ${e.by ? `بواسطة ${e.by}` : ''}`
+    ).join('\n');
+  }
+
+  const embed = embedWarn(`📋 قائمة الإنذارات — ${total} عضو`, desc);
 
   const rows = [new ActionRowBuilder().addComponents(sel)];
-  if (q.items.length > 0) {
-    rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('pun_queue_warn_all').setLabel('⚠️ إنذار الكل').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel('🤝 مسامحة الكل').setStyle(ButtonStyle.Success),
-    ));
+  const btnRow = new ActionRowBuilder();
+  if (q.pendingWarns.length > 0) {
+    btnRow.addComponents(
+      new ButtonBuilder().setCustomId(`pun_queue_send_warns_${q.msgId}`).setLabel(`📨 إرسال الإنذارات (${q.pendingWarns.length})`).setStyle(ButtonStyle.Danger),
+    );
   }
+  if (remaining.length > 0) {
+    btnRow.addComponents(
+      new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel('🤝 مسامحة الكل').setStyle(ButtonStyle.Success),
+    );
+  }
+  if (btnRow.components.length > 0) rows.push(btnRow);
 
   await msg.edit({ embeds: [embed], components: rows });
-  if (q.items.length === 0) {
-    activeQueues.delete(q.msgId);
-  }
+  if (total === 0) activeQueues.delete(q.msgId);
 }
 
 /* ===================================================================
@@ -168,9 +191,12 @@ export async function handleQueueInteraction(interaction) {
 
   let q, qId;
   const parts = customId.split('_');
-  // الأزرار الفردية تحتوي qId مباشرة في الـ customId
-  if (parts.length >= 5) {
-    qId = parts[3] === 'item' ? parts[4] : parts[3];
+  const pLen = parts.length;
+  // استخراج qId من customId حسب النمط
+  if (pLen >= 5) {
+    if (parts[3] === 'sel' || parts[3] === 'warns') qId = parts[4]; // pun_queue_{action}_sel/warns_{qId}
+    else if (parts[3] === 'item') qId = parts[4];                  // pun_queue_forgive_item_{qId}_{idx} (مودال)
+    else qId = parts[3];                                           // pun_queue_{action}_{qId}_{idx} (قديم)
     q = activeQueues.get(qId);
   }
   // Fallback للأزرار على الرسالة الأصلية
@@ -181,87 +207,115 @@ export async function handleQueueInteraction(interaction) {
   }
   // إذا القائمة انمسحت من الذاكرة (إعادة تشغيل البوت)، نبنيها من قاعدة البيانات
   if (!q) {
-    const qIdFromCustom = parts.length >= 5 ? (parts[3] === 'item' ? parts[4] : parts[3]) : null;
+    let qIdFromCustom = null;
+    if (pLen >= 5) {
+      if (parts[3] === 'sel' || parts[3] === 'warns') qIdFromCustom = parts[4];
+      else if (parts[3] === 'item') qIdFromCustom = parts[4];
+      else qIdFromCustom = parts[3];
+    }
     const msgId = qIdFromCustom || interaction.message?.id;
     q = await rebuildQueue(interaction.guild, msgId);
     if (q) qId = msgId;
   }
   if (!q) return interaction.reply({ content: '❌ انتهت الجلسة.', flags: MessageFlags.Ephemeral });
 
-  // Select — تفاصيل فردية
+  // ====== Select Menu (multi-select) ======
   if (interaction.isStringSelectMenu() && customId === 'pun_queue_sel') {
-    const idx = parseInt(interaction.values[0]);
-    const it = q.items[idx];
-    if (!it) return interaction.reply({ content: '❌ العضو غير موجود.', flags: MessageFlags.Ephemeral });
+    const indices = interaction.values.map(Number).filter(i => i >= 0 && i < q.items.length && !q.pendingWarns.includes(i));
+    if (indices.length === 0) return interaction.reply({ content: '❌ جميع المختارين مخصصين للإنذار مسبقاً.', flags: MessageFlags.Ephemeral });
 
-    const emb = embedInfo(`📋 ${it.gm?.displayName || it.discordId}`,
-      `${it.gm}\nإنذار (${it.nextNum}/3) | نقاط: ${it.dailyLog.points || 0} | مخالف: ${it.dailyLog.daysAsViolator || 0} يوم`)
-      .addFields(
-        { name: '⚠️ الإنذار', value: `${it.nextNum}/3`, inline: true },
-        { name: '📊 نقاط', value: `${it.dailyLog.points || 0}`, inline: true },
-        { name: '📅 أيام', value: `${it.dailyLog.daysAsViolator || 0}`, inline: true },
-      );
+    const selKey = `${interaction.user.id}_${qId}`;
+    lastSelections.set(selKey, indices);
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`pun_queue_warn_${qId}_${idx}`).setLabel('⚠️ إنذار').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(`pun_queue_forgive_${qId}_${idx}`).setLabel('🤝 مسامحة').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`pun_queue_warn_sel_${qId}`).setLabel(`⚠️ إنذار المختارين (${indices.length})`).setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`pun_queue_forgive_sel_${qId}`).setLabel(`🤝 مسامحة المختارين (${indices.length})`).setStyle(ButtonStyle.Success),
     );
 
-    await interaction.reply({ embeds: [emb], components: [row], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: `✅ تم اختيار ${indices.length} عضو.`, components: [row], flags: MessageFlags.Ephemeral });
     return true;
   }
 
-  // إنذار الكل
-  if (interaction.isButton() && customId === 'pun_queue_warn_all') {
+  // ====== إنذار المختارين ======
+  if (interaction.isButton() && customId === `pun_queue_warn_sel_${qId}`) {
     await interaction.deferUpdate();
-    const items = [...q.items];
-    await executeBatchWarns(q.guild, items, interaction.user);
-    items.forEach(it => q.log.push({ icon: '⚠️', tag: it.gm?.displayName || it.discordId, action: 'إنذار', by: interaction.user.tag }));
-    q.items = [];
+    const selKey = `${interaction.user.id}_${qId}`;
+    const indices = lastSelections.get(selKey) || [];
+    lastSelections.delete(selKey);
+
+    let moved = 0;
+    for (const idx of indices) {
+      if (idx >= 0 && idx < q.items.length && !q.pendingWarns.includes(idx)) {
+        q.pendingWarns.push(idx);
+        moved++;
+      }
+    }
     await updateQueue(q);
-    await interaction.followUp({ content: `✅ تم إنذار ${items.length} عضو.`, flags: MessageFlags.Ephemeral });
+    await interaction.followUp({ content: `✅ تمت إضافة ${moved} عضو لقائمة الإنذار المعلق.`, flags: MessageFlags.Ephemeral });
     return true;
   }
 
-  // مسامحة الكل
+  // ====== مسامحة المختارين ======
+  if (interaction.isButton() && customId === `pun_queue_forgive_sel_${qId}`) {
+    await interaction.deferUpdate();
+    const selKey = `${interaction.user.id}_${qId}`;
+    const indices = lastSelections.get(selKey) || [];
+    lastSelections.delete(selKey);
+
+    // نفرز من الأكبر إلى الأصغر عشان الـ splice ما يخرب الترتيب
+    const sorted = [...indices].filter(i => i >= 0 && i < q.items.length).sort((a, b) => b - a);
+    let count = 0;
+    for (const idx of sorted) {
+      const it = q.items[idx];
+      if (!it || q.pendingWarns.includes(idx)) continue;
+      await executeSingleForgive(q.guild, it, interaction.user.id, 'مسامحة من لجنة العقوبات');
+      q.log.push({ icon: '🤝', tag: it.gm?.displayName || it.discordId, action: 'مسامحة', by: interaction.user.tag });
+      q.items.splice(idx, 1);
+      // نعدل الـ pendingWarns للأندكسات اللي بعد الممسوح
+      q.pendingWarns = q.pendingWarns.map(p => p > idx ? p - 1 : p).filter(p => p !== idx);
+      count++;
+    }
+    await updateQueue(q);
+    await interaction.followUp({ content: `✅ تمت مسامحة ${count} عضو.`, flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  // ====== إرسال الإنذارات المعلقة ======
+  if (interaction.isButton() && customId === `pun_queue_send_warns_${qId}`) {
+    await interaction.deferUpdate();
+    const pendingItems = [...q.pendingWarns].sort((a, b) => b - a);
+    const toWarn = [];
+    for (const idx of pendingItems) {
+      if (idx >= 0 && idx < q.items.length) {
+        toWarn.push(q.items[idx]);
+        q.items.splice(idx, 1);
+      }
+    }
+    q.pendingWarns = [];
+
+    if (toWarn.length > 0) {
+      await executeBatchWarns(q.guild, toWarn, interaction.user);
+      toWarn.forEach(it => q.log.push({ icon: '⚠️', tag: it.gm?.displayName || it.discordId, action: 'إنذار', by: interaction.user.tag }));
+    }
+    await updateQueue(q);
+    await interaction.followUp({ content: `✅ تم إنزال قرار إنذار لـ ${toWarn.length} عضو.`, flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  // ====== مسامحة الكل ======
   if (interaction.isButton() && customId === 'pun_queue_forgive_all') {
-    const modal = new ModalBuilder()
-      .setCustomId(`pun_queue_forgive_all_modal_${qId}`)
-      .setTitle('🤝 سبب المسامحة');
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('forgive_all_reason').setLabel('السبب').setStyle(TextInputStyle.Paragraph).setMinLength(5).setMaxLength(500).setRequired(true)
-    ));
-    await interaction.showModal(modal);
-    return true;
-  }
-
-  // إنذار فردي
-  if (interaction.isButton() && customId.startsWith('pun_queue_warn_') && customId !== 'pun_queue_warn_all') {
-    const parts = customId.split('_');
-    const qMsgId = parts[3];
-    const idx = parseInt(parts[4]);
-    const modal = new ModalBuilder()
-      .setCustomId(`pun_queue_warn_item_${qMsgId}_${idx}`)
-      .setTitle('⚠️ تأكيد الإنذار');
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('warn_item_reason').setLabel('السبب (اختياري)').setStyle(TextInputStyle.Paragraph).setMaxLength(500).setRequired(false)
-    ));
-    await interaction.showModal(modal);
-    return true;
-  }
-
-  // مسامحة فردية
-  if (interaction.isButton() && customId.startsWith('pun_queue_forgive_') && customId !== 'pun_queue_forgive_all') {
-    const parts = customId.split('_');
-    const qMsgId = parts[3];
-    const idx = parseInt(parts[4]);
-    const modal = new ModalBuilder()
-      .setCustomId(`pun_queue_forgive_item_${qMsgId}_${idx}`)
-      .setTitle('🤝 سبب المسامحة');
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('forgive_item_reason').setLabel('السبب').setStyle(TextInputStyle.Paragraph).setMinLength(5).setMaxLength(500).setRequired(true)
-    ));
-    await interaction.showModal(modal);
+    await interaction.deferUpdate();
+    const toForgive = [...q.items];
+    // الفصل بين الـ pending والـ باقي — نسامح الباقي فقط
+    const forgiveItems = toForgive.filter((_, i) => !q.pendingWarns.includes(i));
+    for (const it of forgiveItems) {
+      await executeSingleForgive(q.guild, it, interaction.user.id, 'مسامحة الكل');
+      q.log.push({ icon: '🤝', tag: it.gm?.displayName || it.discordId, action: 'مسامحة', by: interaction.user.tag });
+    }
+    // نمسح المسامحين من items
+    q.items = q.items.filter((_, i) => q.pendingWarns.includes(i));
+    await updateQueue(q);
+    await interaction.followUp({ content: `✅ تمت مسامحة ${forgiveItems.length} عضو.`, flags: MessageFlags.Ephemeral });
     return true;
   }
 
@@ -269,7 +323,7 @@ export async function handleQueueInteraction(interaction) {
 }
 
 /* ===================================================================
-   مودالات المسامحة
+   مودالات (للتوافق مع الإصدارات القديمة فقط)
    =================================================================== */
 export async function handleQueueModal(interaction) {
   const { customId } = interaction;
@@ -279,48 +333,9 @@ export async function handleQueueModal(interaction) {
     return interaction.editReply({ content: '❌ فقط لجنة العقوبات ولجنة التفاعل والرئاسة تملك الصلاحية.' });
   }
 
-  // مسامحة الكل
-  if (customId.startsWith('pun_queue_forgive_all_modal')) {
-    const reason = interaction.fields.getTextInputValue('forgive_all_reason');
-    const qMsgId = customId.split('_')[5];
-    let q = activeQueues.get(qMsgId);
-    if (!q) q = await rebuildQueue(interaction.guild, qMsgId);
-    if (!q || q.items.length === 0) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
-    const count = q.items.length;
-    for (const it of q.items) {
-      await executeSingleForgive(q.guild, it, interaction.user.id, reason);
-      q.log.push({ icon: '🤝', tag: it.gm?.displayName || it.discordId, action: 'مسامحة', by: interaction.user.tag });
-    }
-    q.items = [];
-    await updateQueue(q);
-    await interaction.editReply({ content: `✅ تمت مسامحة ${count} عضو.` });
-    return;
-  }
-
-  // إنذار فردي
-  if (customId.startsWith('pun_queue_warn_item_')) {
-    const parts = customId.split('_');
-    // pun_queue_warn_item_{qId}_{idx}
-    const qMsgId = parts[4];
-    const idx = parseInt(parts[5]);
-    const reason = interaction.fields.getTextInputValue('warn_item_reason') || 'عدم تفاعل مستمر';
-    let q = activeQueues.get(qMsgId);
-    if (!q) q = await rebuildQueue(interaction.guild, qMsgId);
-    if (!q || !q.items[idx]) return interaction.editReply({ content: '❌ انتهت الجلسة.' });
-    const it = q.items[idx];
-    await executeSingleWarn(q.guild, it, interaction.user);
-    q.log.push({ icon: '⚠️', tag: it.gm?.displayName || it.discordId, action: 'إنذار', by: interaction.user.tag });
-    q.items.splice(idx, 1);
-    await updateQueue(q);
-    await sendSingleWarnDecision(q.guild, it, interaction.user);
-    await interaction.editReply({ content: `✅ تم إنذار ${it.gm}.` });
-    return;
-  }
-
-  // مسامحة فردية
+  // للتوافق — مودال مسامحة فردية قديم
   if (customId.startsWith('pun_queue_forgive_item_')) {
     const parts = customId.split('_');
-    // pun_queue_forgive_item_{qId}_{idx}
     const qMsgId = parts[4];
     const idx = parseInt(parts[5]);
     const reason = interaction.fields.getTextInputValue('forgive_item_reason');
@@ -331,10 +346,13 @@ export async function handleQueueModal(interaction) {
     await executeSingleForgive(q.guild, it, interaction.user.id, reason);
     q.log.push({ icon: '🤝', tag: it.gm?.displayName || it.discordId, action: 'مسامحة', by: interaction.user.tag });
     q.items.splice(idx, 1);
+    q.pendingWarns = q.pendingWarns.map(p => p > idx ? p - 1 : p).filter(p => p !== idx);
     await updateQueue(q);
     await interaction.editReply({ content: `✅ تمت مسامحة ${it.gm}.` });
     return;
   }
+
+  await interaction.editReply({ content: '❌ هذا المودال قديم وملغي.' });
 }
 
 /* ===================================================================

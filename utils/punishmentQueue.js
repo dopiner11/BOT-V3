@@ -173,17 +173,21 @@ async function updateQueue(q) {
 
   const rows = [new ActionRowBuilder().addComponents(sel)];
   const btnRow = new ActionRowBuilder();
+  const warnAllCount = actionableIndices.filter(i => !q.pendingWarns.includes(i)).length;
 
-  if (q.pendingWarns.length > 0) {
+  if (warnAllCount > 0) {
     btnRow.addComponents(
-      new ButtonBuilder().setCustomId(`pun_queue_send_warns_${q.msgId}`).setLabel(`📨 إرسال الإنذارات (${q.pendingWarns.length})`).setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`pun_queue_warn_all_${q.msgId}`).setLabel(`⚠️ إنذار الكل (${warnAllCount})`).setStyle(ButtonStyle.Danger),
     );
   }
-
-  const remainingActionable = actionableIndices.filter(i => !q.pendingWarns.includes(i));
-  if (remainingActionable.length > 0) {
+  if (q.pendingWarns.length > 0) {
     btnRow.addComponents(
-      new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel('🤝 مسامحة الكل').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`pun_queue_send_warns_${q.msgId}`).setLabel(`📨 إرسال الإنذارات (${q.pendingWarns.length})`).setStyle(ButtonStyle.Primary),
+    );
+  }
+  if (warnAllCount > 0) {
+    btnRow.addComponents(
+      new ButtonBuilder().setCustomId('pun_queue_forgive_all').setLabel(`🤝 مسامحة الكل (${warnAllCount})`).setStyle(ButtonStyle.Success),
     );
   }
 
@@ -208,9 +212,9 @@ export async function handleQueueInteraction(interaction) {
   const pLen = parts.length;
   // استخراج qId من customId حسب النمط
   if (pLen >= 5) {
-    if (parts[3] === 'sel' || parts[3] === 'warns') qId = parts[4]; // pun_queue_{action}_sel/warns_{qId}
-    else if (parts[3] === 'item') qId = parts[4];                  // pun_queue_forgive_item_{qId}_{idx} (مودال)
-    else qId = parts[3];                                           // pun_queue_{action}_{qId}_{idx} (قديم)
+    if (parts[3] === 'sel' || parts[3] === 'warns' || parts[3] === 'all') qId = parts[4]; // pun_queue_{action}_sel/warns/all_{qId}
+    else if (parts[3] === 'item') qId = parts[4];                                         // pun_queue_forgive_item_{qId}_{idx} (مودال)
+    else qId = parts[3];                                                                  // pun_queue_{action}_{qId}_{idx} (قديم)
     q = activeQueues.get(qId);
   }
   // Fallback للأزرار على الرسالة الأصلية
@@ -223,7 +227,7 @@ export async function handleQueueInteraction(interaction) {
   if (!q) {
     let qIdFromCustom = null;
     if (pLen >= 5) {
-      if (parts[3] === 'sel' || parts[3] === 'warns') qIdFromCustom = parts[4];
+      if (parts[3] === 'sel' || parts[3] === 'warns' || parts[3] === 'all') qIdFromCustom = parts[4];
       else if (parts[3] === 'item') qIdFromCustom = parts[4];
       else qIdFromCustom = parts[3];
     }
@@ -310,6 +314,22 @@ export async function handleQueueInteraction(interaction) {
     }
     await updateQueue(q);
     await interaction.followUp({ content: `✅ تم إنزال قرار إنذار لـ ${toWarn.length} عضو.`, flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  // ====== إنذار الكل ======
+  if (interaction.isButton() && customId === `pun_queue_warn_all_${qId}`) {
+    await interaction.deferUpdate();
+    let count = 0;
+    for (let i = 0; i < q.items.length; i++) {
+      if (!isActionable(q, i) || q.pendingWarns.includes(i)) continue;
+      q.pendingWarns.push(i);
+      q.forgiven = q.forgiven.filter(f => f !== i);
+      count++;
+    }
+    console.log(`[PunishmentQueue] Warn all: ${count} members added to pending`);
+    await updateQueue(q);
+    await interaction.followUp({ content: `✅ تمت إضافة ${count} عضو لقائمة الإنذار المعلق.`, flags: MessageFlags.Ephemeral });
     return true;
   }
 

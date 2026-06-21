@@ -1,11 +1,10 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags, EmbedBuilder } from 'discord.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { commandRegistry, getCommandInfo, getButtonInfo, getModalInfo } from './actionRegistry.js';
 import { committees as permCommittees, getCommitteesForCommand, getCommitteesForButton, isElevatedCommand, isElevatedButton } from './committeePermissions.js';
 import PersistentMessage from '../models/PersistentMessage.js';
-import { updateSingleCommittee } from './webhookManager.js';
 import { info as embedInfo, gold as embedGold, custom as embedCustom } from './embedStyles.js';
 import { loadConfig } from './configLoader.js';
 
@@ -13,6 +12,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const committeeDataPath = join(__dirname, '../.data/Committees.json');
+
+const COMMITTEE_COLORS = {
+  punishment: 0xE74C3C,
+  interaction: 0x3498DB,
+  promotion: 0x2ECC71,
+  family_presidency: 0xF1C40F,
+  blackMarket: 0x2C3E50,
+};
+
+const COMMITTEE_EMOJIS = {
+  punishment: '🛡️',
+  interaction: '📋',
+  promotion: '🎖️',
+  family_presidency: '👑',
+  blackMarket: '🏴‍☠️',
+};
 
 function loadCommittees() {
   try {
@@ -272,32 +287,56 @@ export function checkManagePermission(member, targetCommitteeKey, targetRole) {
 
 function createCommitteeEmbed(guild, committeeKey, committee) {
     const config = loadConfig();
+    const emoji = COMMITTEE_EMOJIS[committeeKey] || '🏛️';
+    const color = COMMITTEE_COLORS[committeeKey] || 0x2B2D31;
+    const memberEmoji = committeeKey === 'family_presidency' ? '👑 أعضاء الرئاسة' : '👥 أعضاء اللجنة';
     const isPresidency = committeeKey === 'family_presidency';
 
-    let description = `**نظام إدارة ${committee.name}**\n\nالمسؤوليات:\n${(committee.allowedActions || []).map(a => `• ${a === 'ALL' ? 'إدارة كاملة' : a}`).join('\n') || '• مهام عامة'}`;
+    const managers = (committee.roles?.manager || []).map(id => `<@${id}>`);
+    const deputies = (committee.roles?.deputy || []).map(id => `<@${id}>`);
+    const members = (committee.roles?.member || []).map(id => `<@${id}>`);
+    const totalMembers = managers.length + deputies.length + members.length;
 
-    const fields = [];
-    const managers = (committee.roles?.manager || []).length > 0 ? committee.roles.manager.map(id => `<@${id}>`).join('\n') : 'غير محدد';
-    const deputies = (committee.roles?.deputy || []).length > 0 ? committee.roles.deputy.map(id => `<@${id}>`).join('\n') : 'غير محدد';
-    const members = (committee.roles?.member || []).length > 0 ? committee.roles.member.map(id => `<@${id}>`).join('\n') : 'لا يوجد';
+    let desc = '';
+    desc += `${emoji} 𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 — ${committee.name}\n\n`;
+    desc += '━━━━━━━━━━━━━━━━━━━━\n';
+    desc += '📌 **الصلاحيات**\n';
+    desc += `${(committee.allowedActions || []).map(a => `🞄 ${a === 'ALL' ? 'إدارة كاملة' : a}`).join('\n') || '🞄 مهام عامة'}`;
+    desc += '\n━━━━━━━━━━━━━━━━━━━━\n';
+
+    if (!isPresidency) {
+        desc += `👑 المسؤول  ·  🌟 النائب  ·  👥 الأعضاء\n`;
+        desc += '━━━━━━━━━━━━━━━━━━━━\n';
+    }
 
     if (isPresidency) {
-        fields.push({ name: '👑 أعضاء الرئاسة', value: members, inline: false });
+        desc += `${memberEmoji}:\n${members.join(' ') || 'لا يوجد'}\n`;
     } else {
-        fields.push({ name: '👑 المسؤولين', value: managers, inline: true });
-        fields.push({ name: '🌟 النواب', value: deputies, inline: true });
-        fields.push({ name: '👥 أعضاء اللجنة', value: members, inline: false });
+        if (managers.length > 0) desc += `👑 المسؤول: ${managers.join(' ')}\n`;
+        if (deputies.length > 0) desc += `🌟 النائب: ${deputies.join(' ')}\n`;
+        const memberList = members.length > 10
+            ? `${members.slice(0, 10).join(' ')} +${members.length - 10}`
+            : members.join(' ');
+        desc += `👥 الأعضاء: ${memberList || 'لا يوجد'}\n`;
     }
 
-    const founders = (config.committees?.founders || []);
+    const founders = (config.committees?.founders || []).map(id => `<@${id}>`);
     if (founders.length > 0) {
-        fields.push({ name: '💎 المؤسسين', value: founders.map(id => `<@${id}>`).join(' , '), inline: false });
+        desc += '\n━━━━━━━━━━━━━━━━━━━━\n';
+        desc += `💎 المؤسسين: ${founders.join(' ')}\n`;
     }
 
-    const embed = isPresidency 
-        ? embedGold(`🏛️ ${committee.name}`, description, fields) 
-        : embedCustom('0x2B2D31', `🏛️ ${committee.name}`, description, fields);
-    embed.setThumbnail(guild.iconURL());
+    desc += '\n━━━━━━━━━━━━━━━━━━━━\n';
+    desc += `👥 **${totalMembers}** أعضاء`;
+    if (!isPresidency) {
+        desc += `  |  👑 ${managers.length} مسؤول  |  🌟 ${deputies.length} نائب  |  👥 ${members.length} عضو`;
+    }
+
+    const embed = new EmbedBuilder()
+        .setColor(color)
+        .setDescription(desc)
+        .setFooter({ text: `🕐 آخر تحديث: ${new Date().toLocaleString('ar-IQ', { timeZone: 'Asia/Baghdad', dateStyle: 'medium', timeStyle: 'short' })}` })
+        .setTimestamp();
 
     return embed;
 }
@@ -311,33 +350,41 @@ export async function refreshCommitteePanel(guild, committeeKey) {
         const channel = await guild.channels.fetch(committee.channelId).catch(() => null);
         if (!channel) return;
 
-        const isPresidency = committeeKey === 'family_presidency';
         const embed = createCommitteeEmbed(guild, committeeKey, committee);
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('committee_control_btn')
-                .setLabel(isPresidency ? '⚙️ التحكم المركزي' : '⚙️ التحكم باللجنة')
-                .setStyle(ButtonStyle.Primary),
+                .setStyle(ButtonStyle.Primary)
+                .setLabel(committeeKey === 'family_presidency' ? '⚙️ التحكم المركزي' : '⚙️ التحكم'),
             new ButtonBuilder()
                 .setCustomId('cmd_show_panel')
-                .setLabel('⚡ أوامر اللجنة')
                 .setStyle(ButtonStyle.Secondary)
+                .setLabel('⚡ الأوامر'),
+            new ButtonBuilder()
+                .setCustomId('comm_refresh_panel')
+                .setStyle(ButtonStyle.Success)
+                .setLabel('🔄 تحديث'),
         );
-
-        let content = null;
-        if (isPresidency && (committee.roles?.member || []).length > 0) {
-            content = `📢 **أعضاء الرئاسة:** ${committee.roles.member.map(id => `<@${id}>`).join(' ')}`;
-        }
 
         const pMsg = await PersistentMessage.findOne({ key: `committeePanel_${committeeKey}` });
         let message = pMsg ? await channel.messages.fetch(pMsg.messageId).catch(() => null) : null;
 
         if (message) {
-            await message.edit({ content, embeds: [embed], components: [row] }).catch(() => { message = null; });
+            const editResult = await message.edit({ embeds: [embed], components: [row] }).catch(err => err);
+            if (editResult instanceof Error) {
+                if (editResult.code === 10008) {
+                    message = null;
+                } else {
+                    if (editResult.code !== 10003 && editResult.code !== 50001) {
+                        console.error(`❌ [CommitteePanel] edit error ${committeeKey}:`, editResult.message);
+                    }
+                    return;
+                }
+            }
         }
 
         if (!message) {
-            const newMsg = await channel.send({ content, embeds: [embed], components: [row] });
+            const newMsg = await channel.send({ embeds: [embed], components: [row] });
             await PersistentMessage.findOneAndUpdate(
                 { key: `committeePanel_${committeeKey}` },
                 { key: `committeePanel_${committeeKey}`, guildId: guild.id, channelId: channel.id, messageId: newMsg.id, updatedAt: new Date() },
@@ -381,6 +428,15 @@ export async function handleCommitteeInteraction(interaction) {
         else if (customId.startsWith('comm_sel_pos_')) await handlePositionSelection(interaction);
         else if (customId === 'comm_remove_user_modal') await processRemovePerson(interaction);
         else if (customId === 'comm_interaction_review') await handleInteractionReview(interaction);
+        else if (customId === 'comm_refresh_panel') {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+            const config = loadConfig();
+            const committeeEntry = await findCommitteeByInteraction(interaction, config);
+            if (!committeeEntry) return interaction.editReply('❌ هذه القناة غير مرتبطة بأي لجنة.').catch(() => {});
+            const [key] = committeeEntry;
+            await refreshCommitteePanel(interaction.guild, key);
+            await interaction.editReply('✅ تم تحديث اللوحة.').catch(() => {});
+        }
     } catch (err) {
         const ignore = [10008, 10062, 40060, 50001, 'UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'];
         if (err.code && ignore.includes(err.code)) return;
@@ -531,7 +587,6 @@ async function handlePositionSelection(interaction) {
 
     saveConfig(config);
     await manageCommitteeThread(interaction.guild, committee.threadId, targetId, 'add');
-    await updateSingleCommittee(interaction.client, commKey, committee);
     await interaction.editReply({ content: `✅ تم إضافة <@${targetId}> في ${committee.name}.`, components: [] }).catch(() => { });
     await refreshCommitteePanel(interaction.guild, commKey);
     sendAuditLog(interaction.guild, config, '➕ إضافة', committee.name, targetId, position, interaction.user.id);
@@ -583,7 +638,6 @@ async function processRemovePerson(interaction) {
     committee.roles[targetPosition] = committee.roles[targetPosition].filter(id => id !== targetId);
     saveConfig(config);
     await manageCommitteeThread(interaction.guild, committee.threadId, targetId, 'remove');
-    await updateSingleCommittee(interaction.client, key, committee);
     await interaction.editReply(`✅ تم حذف <@${targetId}> من ${committee.name}.`).catch(() => { });
     await refreshCommitteePanel(interaction.guild, key);
     sendAuditLog(interaction.guild, config, '➖ إزالة', committee.name, targetId, targetPosition, interaction.user.id);

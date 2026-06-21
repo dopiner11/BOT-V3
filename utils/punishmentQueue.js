@@ -408,7 +408,7 @@ async function executeSingleWarn(guild, item, executor) {
   if (item.gm) {
     let roleId = config.warnings?.roles?.[num.toString()];
     const actual = roleId?.id || roleId;
-    if (actual) await item.gm.roles.add(actual).catch(() => {});
+    if (actual) await item.gm.roles.add(actual).catch(e => console.error(`[PunishmentQueue] فشل إضافة رول ${actual} لـ ${item.discordId}:`, e.message));
   }
 
   const dl = await ensureDailyLog(item.discordId);
@@ -420,17 +420,17 @@ async function executeSingleWarn(guild, item, executor) {
   });
 
   const { updateRoomEmoji } = await import('./interactionSystem.js');
-  await updateRoomEmoji(guild, item.discordId, getStatusEmoji(STATUS.WARNED)).catch(() => {});
+  await updateRoomEmoji(guild, item.discordId, getStatusEmoji(STATUS.WARNED)).catch(e => console.error(`[PunishmentQueue] فشل تحديث إيموجي ${item.discordId}:`, e.message));
 
   item.memberData._lastInteractionStatus = STATUS.WARNED;
-  await item.memberData.save().catch(() => {});
+  await item.memberData.save().catch(e => console.error(`[PunishmentQueue] فشل حفظ memberData ${item.discordId}:`, e.message));
 
   const user = await guild.client.users.fetch(item.discordId).catch(() => null);
   if (user) {
     const rem = 3 - num;
     let m = `🟤 **تم تسجيل إنذار بعدم التفاعل.**\nمعك الآن ${num} من ٣ إنذارات.\n`;
     m += rem > 0 ? `متبقي ${rem} إنذار.` : '⚠️ وصلت ٣ إنذارات — اللجنة مخولة بفصلك.';
-    await user.send(m).catch(() => {});
+    await user.send(m).catch(e => console.error(`[PunishmentQueue] فشل إرسال DM إنذار لـ ${item.discordId}:`, e.message));
   }
 }
 
@@ -444,7 +444,7 @@ async function sendSingleWarnDecision(guild, item, executor) {
   const basicRoleId = config.roles?.basic?.id || '';
   if (!ch) return;
 
-  await ch.send({ content: WARN_GIF }).catch(() => {});
+  await ch.send({ content: WARN_GIF }).catch(e => console.error(`[PunishmentQueue] فشل إرسال GIF قرار إنذار فردي:`, e.message));
 
   const arabic = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس'][item.nextNum - 1] || item.nextNum;
   const decision = `
@@ -464,7 +464,7 @@ async function sendSingleWarnDecision(guild, item, executor) {
 ||<@&${basicRoleId}>||
 ▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
 
-  await ch.send({ content: decision }).catch(() => {});
+  await ch.send({ content: decision }).catch(e => console.error(`[PunishmentQueue] فشل إرسال قرار إنذار فردي:`, e.message));
 }
 
 /* ===================================================================
@@ -480,7 +480,7 @@ async function executeBatchWarns(guild, items, executor) {
   const basicRoleId = config.roles?.basic?.id || '';
   if (!ch) return;
 
-  await ch.send({ content: WARN_GIF }).catch(() => {});
+  await ch.send({ content: WARN_GIF }).catch(e => console.error(`[PunishmentQueue] فشل إرسال GIF قرار الدفعة:`, e.message));
 
   const membersList = items.map(it => `- <@${it.discordId}>`).join('\n');
   const details = items.map(it => {
@@ -505,7 +505,7 @@ ${details}
 ||<@&${basicRoleId}>||
 ▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
 
-  await ch.send({ content: decision }).catch(() => {});
+  await ch.send({ content: decision }).catch(e => console.error(`[PunishmentQueue] فشل إرسال قرار الدفعة:`, e.message));
 }
 
 /* ===================================================================
@@ -525,9 +525,9 @@ async function executeSingleForgive(guild, item, executorId, reason) {
   await logForgive(guild, {
     target: `<@${item.discordId}>`, mod: `<@${executorId}>`,
     reason, warningCount: wc, totalWarnings: 3,
-  }).catch(() => {});
+  }).catch(e => console.error(`[PunishmentQueue] فشل تسجيل logForgive ${item.discordId}:`, e.message));
 
   const { quickClassify, updateRoomEmoji } = await import('./interactionSystem.js');
   const res = await quickClassify(item.discordId);
-  if (res?.emoji) await updateRoomEmoji(guild, item.discordId, res.emoji).catch(() => {});
+  if (res?.emoji) await updateRoomEmoji(guild, item.discordId, res.emoji).catch(e => console.error(`[PunishmentQueue] فشل تحديث إيموجي بعد المسامحة ${item.discordId}:`, e.message));
 }

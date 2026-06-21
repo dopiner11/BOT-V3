@@ -5,10 +5,46 @@ import { applyPromotion, getDaysInRank, isOnLeave, sendBulkAnnouncement } from '
 import { custom as embedCustom } from '../utils/embedStyles.js';
 import { loadConfig } from '../utils/configLoader.js';
 
-const config = loadConfig();
-const LOG_CHANNEL_ID = config.logChannels?.promotion?.id || "1463557267340394674";
-
 const activeQueues = new Map();
+
+function getLogChannelId() {
+  const cfg = loadConfig();
+  return cfg.logChannels?.promotion?.id || "1463557267340394674";
+}
+
+function hasPromotionPermission(member) {
+  const cfg = loadConfig();
+  const userId = member.id;
+  const founders = cfg.committees?.founders || [];
+  const authorized = cfg.committees?.authorizedUsers || [];
+  if (founders.includes(userId) || authorized.includes(userId)) return true;
+
+  const prom = cfg.committees?.list?.promotion;
+  if (prom?.roles) {
+    const allRoles = [
+      ...(prom.roles.manager || []),
+      ...(prom.roles.deputy || []),
+      ...(prom.roles.member || [])
+    ];
+    for (const r of allRoles) {
+      if (r === userId || member.roles?.cache?.has(r)) return true;
+    }
+  }
+
+  const pres = cfg.committees?.list?.family_presidency;
+  if (pres?.roles) {
+    const allPres = [
+      ...(pres.roles.manager || []),
+      ...(pres.roles.deputy || []),
+      ...(pres.roles.member || [])
+    ];
+    for (const r of allPres) {
+      if (r === userId || member.roles?.cache?.has(r)) return true;
+    }
+  }
+
+  return false;
+}
 
 async function checkActiveNomination(discordId) {
   const existing = await Nomination.findOne({ targetId: discordId, ended: { $ne: true } });
@@ -23,11 +59,16 @@ export default {
     .addBooleanOption(option => option.setName('صامت').setDescription('بدون خاص')),
 
   async execute(interaction) {
+    if (!hasPromotionPermission(interaction.member)) {
+      return interaction.reply({ content: '❌ لا تملك صلاحية استخدام هذا الأمر.', flags: MessageFlags.Ephemeral });
+    }
+
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    const cfg = loadConfig();
     const targetUser = interaction.options.getUser('عضو');
     const silent = interaction.options.getBoolean('صامت') || false;
-    const ranks = config.promotion?.ranks || [];
+    const ranks = cfg.promotion?.ranks || [];
 
     if (targetUser) {
       const m = await Member.findOne({ discordId: targetUser.id });
@@ -65,38 +106,54 @@ export default {
         });
         await interaction.editReply(`✅ تم ترقية ${targetUser} بنجاح.`);
       } else if (hasDays || hasPoints) {
-        await sendToPendingLog(interaction, m, gm, currentRank, nextRank, hasPoints, hasDays, nextRankIndex);
-        await interaction.editReply(`⚠️ العضو مستوفي لأحد الشروط فقط. تم إرسال طلب إلى <#${LOG_CHANNEL_ID}> لاتخاذ القرار.`);
+        const logChId = getLogChannelId();
+        const logChannel = interaction.guild.channels.cache.get(logChId) || await interaction.guild.channels.fetch(logChId).catch(() => null);
+        if (logChannel) {
+          const embed = embedCustom(0xFFA500, '⚠️ طلب ترقية (شروط جزئية)',
+            `العضو: ${gm} (<@${m.discordId}>) مستوفي لأحد الشروط فقط.\n\nاستخدم الأمر /ترقيات بدون تحديد عضو لإجراء فحص شامل وإرسال قائمة انتظار.`)
+            .addFields(
+              { name: '👤 العضو', value: `${gm} (${m.discordId})`, inline: true },
+              { name: '📉 الرتبة الحالية', value: currentRank?.roleId ? `<@&${currentRank.roleId}>` : (currentRank?.name || 'غير معروف'), inline: true },
+              { name: '📈 الرتبة المرشحة', value: nextRank?.roleId ? `<@&${nextRank.roleId}>` : (nextRank?.name || 'غير معروف'), inline: true },
+              { name: '💰 النقاط', value: `${m.points} / ${nextRank.requiredPoints} (${hasPoints ? '✅' : '❌'})`, inline: true },
+              { name: '📅 الأيام', value: `${getDaysInRank(m)} / ${nextRank.requiredDays} (${hasDays ? '✅' : '❌'})`, inline: true },
+              { name: '🕒 آخر ترقية', value: m.lastPromotionDate ? `<t:${Math.floor(new Date(m.lastPromotionDate).getTime() / 1000)}:R>` : 'غير مسجل', inline: true }
+            );
+          await logChannel.send({ content: `طلب ترقية تلقائي (جزئي) من فحص ${interaction.user}`, embeds: [embed] });
+        }
+        await interaction.editReply(`⚠️ العضو مستوفي لأحد الشروط فقط. تم إرسال طلب إلى <#${getLogChannelId()}> لاتخاذ القرار.`);
       } else {
         await interaction.editReply(`❌ العضو غير مستوفي للشروط (النقاط: ${m.points}/${nextRank.requiredPoints}, الأيام: ${days}/${nextRank.requiredDays}).`);
       }
 
     } else {
       const members = await Member.find({ isActive: true });
-      let promoted = 0;
-      let pending = 0;
       let checked = 0;
       const nomChecks = [];
 
       for (const m of members) {
-        checked++;
-        const gm = await interaction.guild.members.fetch(m.discordId).catch(() => null);
-        if (!gm) continue;
+        try {
+          checked++;
+          const gm = await interaction.guild.members.fetch(m.discordId).catch(() => null);
+          if (!gm) continue;
 
-        const currentRankIndex = (m.jobNumber || 1) - 1;
-        const nextRankIndex = currentRankIndex + 1;
-        const nextRank = ranks[nextRankIndex];
+          const currentRankIndex = (m.jobNumber || 1) - 1;
+          const nextRankIndex = currentRankIndex + 1;
+          const nextRank = ranks[nextRankIndex];
 
-        if (!nextRank) continue;
+          if (!nextRank) continue;
 
-        const currentRank = ranks[currentRankIndex];
-        const days = getDaysInRank(m);
-        const hasDays = days >= (nextRank.requiredDays || 0);
-        const hasPoints = (m.points || 0) >= (nextRank.requiredPoints || 0);
+          const currentRank = ranks[currentRankIndex];
+          const days = getDaysInRank(m);
+          const hasDays = days >= (nextRank.requiredDays || 0);
+          const hasPoints = (m.points || 0) >= (nextRank.requiredPoints || 0);
 
-        if (!hasDays && !hasPoints) continue;
+          if (!hasDays && !hasPoints) continue;
 
-        nomChecks.push({ m, gm, currentRank, nextRank, nextRankIndex, hasDays, hasPoints, days });
+          nomChecks.push({ m, gm, currentRank, nextRank, nextRankIndex, hasDays, hasPoints, days });
+        } catch (e) {
+          console.error(`[Promotion] فشل فحص ${m.discordId}:`, e.message);
+        }
       }
 
       const activeNoms = await Nomination.find({ ended: { $ne: true } });
@@ -104,59 +161,44 @@ export default {
 
       const pendingItems = [];
 
-      for (const { m, gm, currentRank, nextRank, nextRankIndex, hasDays, hasPoints } of nomChecks) {
-        if (nominatedIds.has(m.discordId)) { pending++; continue; }
-        if (await isOnLeave(m.discordId)) { console.log(`[Promotion] ${m.discordId} skipped (leave)`); continue; }
-
-        pendingItems.push({ m, gm, currentRank, nextRank, nextRankIndex, hasDays, hasPoints, status: 'pending', reason: '' });
+      for (const item of nomChecks) {
+        try {
+          if (nominatedIds.has(item.m.discordId)) continue;
+          if (await isOnLeave(item.m.discordId)) continue;
+          pendingItems.push({ m: item.m, gm: item.gm, currentRank: item.currentRank, nextRank: item.nextRank, nextRankIndex: item.nextRankIndex, hasDays: item.hasDays, hasPoints: item.hasPoints, status: 'pending', reason: '' });
+        } catch (e) {
+          console.error(`[Promotion] فشل معالجة ${item.m.discordId}:`, e.message);
+        }
       }
 
       if (pendingItems.length > 0) {
         await sendQueueMessage(interaction, pendingItems);
-        pending = pendingItems.length;
       }
 
-      await interaction.editReply(`✅ انتهى فحص الترقيات: \n👥 تم فحص: **${checked}**\n⚠️ تم إرسال **${pending}** عضو لقائمة الانتظار.`);
+      await interaction.editReply(`✅ انتهى فحص الترقيات: \n👥 تم فحص: **${checked}**\n⚠️ تم إرسال **${pendingItems.length}** عضو لقائمة الانتظار.`);
     }
   }
 };
-
-async function sendToPendingLog(interaction, m, gm, currentRank, nextRank, hasPoints, hasDays, nextRankIndex) {
-  const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID) || await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-  if (logChannel) {
-    const embed = embedCustom(0xFFA500, '⚠️ طلب ترقية (شروط جزئية)',
-      `العضو: ${gm} (<@${m.discordId}>) مستوفي لأحد الشروط فقط.\n\nاستخدم الأمر /ترقيات بدون تحديد عضو لإجراء فحص شامل وإرسال قائمة انتظار.`)
-      .addFields(
-        { name: '👤 العضو', value: `${gm} (${m.discordId})`, inline: true },
-        { name: '📉 الرتبة الحالية', value: currentRank?.roleId ? `<@&${currentRank.roleId}>` : (currentRank?.name || 'غير معروف'), inline: true },
-        { name: '📈 الرتبة المرشحة', value: nextRank?.roleId ? `<@&${nextRank.roleId}>` : (nextRank?.name || 'غير معروف'), inline: true },
-        { name: '💰 النقاط', value: `${m.points} / ${nextRank.requiredPoints} (${hasPoints ? '✅' : '❌'})`, inline: true },
-        { name: '📅 الأيام', value: `${getDaysInRank(m)} / ${nextRank.requiredDays} (${hasDays ? '✅' : '❌'})`, inline: true },
-        { name: '🕒 آخر ترقية', value: m.lastPromotionDate ? `<t:${Math.floor(new Date(m.lastPromotionDate).getTime() / 1000)}:R>` : 'غير مسجل', inline: true }
-      );
-
-    await logChannel.send({ content: `طلب ترقية تلقائي (جزئي) من فحص ${interaction.user}`, embeds: [embed] });
-  }
-}
 
 async function queueSummary(items) {
   return items.map((item, i) => {
     const icon = item.status === 'approved' ? '🟢' : item.status === 'rejected' ? '🔴' : '🟡';
     const statusText = item.status === 'approved' ? '✅ مقبول' : item.status === 'rejected' ? `❌ مرفوض (${item.reason || 'بدون سبب'})` : '⏳ بانتظار المراجعة';
-    return `${icon} ${i + 1}. ${item.gm} — ${item.currentRank?.name || '?'} ← ${item.nextRank?.name || '?'}\n      نقاط: ${item.m.points}/${item.nextRank?.requiredPoints} أيام: ${getDaysInRank(item.m)}/${item.nextRank?.requiredDays}  ${statusText}`;
+    return `${icon} ${i + 1}. <@${item.m.discordId}> — ${item.currentRank?.name || '?'} ← ${item.nextRank?.name || '?'}\n      نقاط: ${item.m.points}/${item.nextRank?.requiredPoints} أيام: ${getDaysInRank(item.m)}/${item.nextRank?.requiredDays}  ${statusText}`;
   }).join('\n');
 }
 
 async function sendQueueMessage(interaction, items) {
-  const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID) || await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+  const logChId = getLogChannelId();
+  const logChannel = interaction.guild.channels.cache.get(logChId) || await interaction.guild.channels.fetch(logChId).catch(() => null);
   if (!logChannel) return;
 
   const memberId = interaction.user.id;
   const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`prom_queue_select_${memberId}`)
+    .setCustomId(`prom_queue_select`)
     .setPlaceholder('اختر عضواً لعرض التفاصيل')
     .addOptions(items.slice(0, 25).map((item, i) => ({
-      label: `${item.gm?.displayName || item.m.discordId}`,
+      label: item.gm?.displayName || item.m.discordId,
       description: `${item.currentRank?.name || '?'} ← ${item.nextRank?.name || '?'} | ${item.status}`,
       value: `${i}`,
     })));
@@ -168,82 +210,101 @@ async function sendQueueMessage(interaction, items) {
   const rows = [new ActionRowBuilder().addComponents(selectMenu)];
   const actionRow = new ActionRowBuilder();
   actionRow.addComponents(
-    new ButtonBuilder().setCustomId(`prom_queue_approve_${memberId}`).setLabel('✅ قبول الكل').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`prom_queue_reject_${memberId}`).setLabel('❌ رفض الكل').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('prom_queue_approve_all').setLabel('✅ قبول الكل').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('prom_queue_reject_all').setLabel('❌ رفض الكل').setStyle(ButtonStyle.Danger),
   );
   rows.push(actionRow);
   if (allReviewed) {
     rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`prom_queue_submit_${memberId}`).setLabel('📨 إرسال الترقيات').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('prom_queue_submit').setLabel('📨 إرسال الترقيات').setStyle(ButtonStyle.Primary),
     ));
   }
 
   const msg = await logChannel.send({ embeds: [embed], components: rows });
-  activeQueues.set(msg.id, { ownerId: memberId, items, channelId: logChannel.id, messageId: msg.id, interaction });
+  activeQueues.set(msg.id, { ownerId: memberId, items, channelId: logChannel.id, messageId: msg.id, guildId: interaction.guild.id });
 }
 
-async function updateQueueMessage(queue, reasonMap = {}) {
-  const guild = queue.interaction.guild;
-  const logChannel = guild.channels.cache.get(queue.channelId) || await guild.channels.fetch(queue.channelId).catch(() => null);
-  if (!logChannel) return;
-  const msg = await logChannel.messages.fetch(queue.messageId).catch(() => null);
-  if (!msg) return;
+async function updateQueueMessage(queue) {
+  try {
+    const guild = await queue.guildId ? null : null;
+    const client = (await import('../index.js')).default;
+    const fetchedGuild = await client?.guilds?.fetch?.(queue.guildId).catch(() => null);
+    if (!fetchedGuild) return;
+    const logChannel = fetchedGuild.channels.cache.get(queue.channelId) || await fetchedGuild.channels.fetch(queue.channelId).catch(() => null);
+    if (!logChannel) return;
+    const msg = await logChannel.messages.fetch(queue.messageId).catch(() => null);
+    if (!msg) return;
 
-  const memberId = queue.ownerId;
-  const allReviewed = queue.items.every(item => item.status !== 'pending');
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`prom_queue_select_${memberId}`)
-    .setPlaceholder('اختر عضواً لعرض التفاصيل')
-    .addOptions(queue.items.slice(0, 25).map((item, i) => ({
-      label: `${item.gm?.displayName || item.m.discordId}`,
-      description: `${item.currentRank?.name || '?'} ← ${item.nextRank?.name || '?'} | ${item.status}`,
-      value: `${i}`,
-    })));
+    const allReviewed = queue.items.every(item => item.status !== 'pending');
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('prom_queue_select')
+      .setPlaceholder('اختر عضواً لعرض التفاصيل')
+      .addOptions(queue.items.slice(0, 25).map((item, i) => ({
+        label: item.gm?.displayName || item.m.discordId,
+        description: `${item.currentRank?.name || '?'} ← ${item.nextRank?.name || '?'} | ${item.status}`,
+        value: `${i}`,
+      })));
 
-  const embed = embedCustom(0xFFA500, `⏳ قائمة الترقيات المعلقة — ${queue.items.length} عضو`,
-    `حالة المراجعة:\n${await queueSummary(queue.items)}`);
+    const embed = embedCustom(0xFFA500, `⏳ قائمة الترقيات المعلقة — ${queue.items.length} عضو`,
+      `حالة المراجعة:\n${await queueSummary(queue.items)}`);
 
-  const rows = [new ActionRowBuilder().addComponents(selectMenu)];
-  const actionRow = new ActionRowBuilder();
-  actionRow.addComponents(
-    new ButtonBuilder().setCustomId(`prom_queue_approve_${memberId}`).setLabel('✅ قبول الكل').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`prom_queue_reject_${memberId}`).setLabel('❌ رفض الكل').setStyle(ButtonStyle.Danger),
-  );
-  rows.push(actionRow);
-  if (allReviewed) {
-    rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`prom_queue_submit_${memberId}`).setLabel('📨 إرسال الترقيات').setStyle(ButtonStyle.Primary),
-    ));
+    const rows = [new ActionRowBuilder().addComponents(selectMenu)];
+    const actionRow = new ActionRowBuilder();
+    actionRow.addComponents(
+      new ButtonBuilder().setCustomId('prom_queue_approve_all').setLabel('✅ قبول الكل').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('prom_queue_reject_all').setLabel('❌ رفض الكل').setStyle(ButtonStyle.Danger),
+    );
+    rows.push(actionRow);
+    if (allReviewed) {
+      rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('prom_queue_submit').setLabel('📨 إرسال الترقيات').setStyle(ButtonStyle.Primary),
+      ));
+    }
+
+    await msg.edit({ embeds: [embed], components: rows });
+  } catch (e) {
+    console.error('[Promotion] فشل تحديث القائمة:', e.message);
   }
-
-  await msg.edit({ embeds: [embed], components: rows });
 }
 
 export async function handlePromotionQueueInteraction(interaction) {
   const { customId, user } = interaction;
   if (!customId.startsWith('prom_queue_')) return;
 
-  // Find queue owned by this user
+  if (!hasPromotionPermission(interaction.member)) {
+    return interaction.reply({ content: '❌ لا تملك صلاحية التفاعل مع قائمة الترقيات.', flags: MessageFlags.Ephemeral });
+  }
+
   let queue = null;
   let queueMsgId = null;
   for (const [msgId, q] of activeQueues) {
     if (q.ownerId === user.id) { queue = q; queueMsgId = msgId; break; }
   }
+  if (!queue) {
+    const cfg = loadConfig();
+    const promRole = cfg.committees?.list?.promotion?.roles?.manager?.[0];
+    if (promRole && interaction.member.roles?.cache?.has(promRole)) {
+      for (const [msgId, q] of activeQueues) {
+        queue = q; queueMsgId = msgId; break;
+      }
+    }
+  }
   if (!queue) return interaction.reply({ content: '❌ انتهت صلاحية الجلسة.', flags: MessageFlags.Ephemeral });
-  const ownerId = user.id;
+  const ownerId = queue.ownerId;
 
   // Handle select menu
-  if (interaction.isStringSelectMenu() && customId.startsWith('prom_queue_select_')) {
+  if (interaction.isStringSelectMenu() && customId === 'prom_queue_select') {
     const index = parseInt(interaction.values[0]);
     const item = queue.items[index];
     if (!item) return interaction.reply({ content: '❌ العضو غير موجود.', flags: MessageFlags.Ephemeral });
 
-    const ranks = config.promotion?.ranks || [];
+    const cfg = loadConfig();
+    const ranks = cfg.promotion?.ranks || [];
     const currentRank = ranks[(item.m.jobNumber || 1) - 1];
     const nextRank = ranks[item.nextRankIndex];
     const days = getDaysInRank(item.m);
     const embed = embedCustom(0xFFA500, `📋 تفاصيل ${item.gm?.displayName || item.m.discordId}`,
-      `${item.gm} — ${currentRank?.name || '?'} ← ${nextRank?.name || '?'}\nالحالة: ${item.status === 'approved' ? '✅ مقبول' : item.status === 'rejected' ? `❌ مرفوض (${item.reason})` : '⏳ بانتظار المراجعة'}`)
+      `<@${item.m.discordId}> — ${currentRank?.name || '?'} ← ${nextRank?.name || '?'}\nالحالة: ${item.status === 'approved' ? '✅ مقبول' : item.status === 'rejected' ? `❌ مرفوض (${item.reason})` : '⏳ بانتظار المراجعة'}`)
       .addFields(
         { name: '📅 الأيام في الرتبة', value: `${days}/${nextRank?.requiredDays || '?'}`, inline: true },
         { name: '⭐ النقاط', value: `${item.m.points || 0}/${nextRank?.requiredPoints || '?'}`, inline: true },
@@ -251,10 +312,10 @@ export async function handlePromotionQueueInteraction(interaction) {
 
     const row = new ActionRowBuilder();
     if (item.status !== 'approved') {
-      row.addComponents(new ButtonBuilder().setCustomId(`prom_queue_item_approve_${ownerId}_${index}`).setLabel('✅ قبول').setStyle(ButtonStyle.Success));
+      row.addComponents(new ButtonBuilder().setCustomId(`prom_queue_item_approve_${index}`).setLabel('✅ قبول').setStyle(ButtonStyle.Success));
     }
     if (item.status !== 'rejected') {
-      row.addComponents(new ButtonBuilder().setCustomId(`prom_queue_item_reject_${ownerId}_${index}`).setLabel('❌ رفض').setStyle(ButtonStyle.Danger));
+      row.addComponents(new ButtonBuilder().setCustomId(`prom_queue_item_reject_${index}`).setLabel('❌ رفض').setStyle(ButtonStyle.Danger));
     }
     const components = row.components.length > 0 ? [row] : [];
     await interaction.reply({ embeds: [embed], components, flags: MessageFlags.Ephemeral });
@@ -262,7 +323,7 @@ export async function handlePromotionQueueInteraction(interaction) {
   }
 
   // Handle approve all
-  if (interaction.isButton() && customId.startsWith('prom_queue_approve_')) {
+  if (interaction.isButton() && customId === 'prom_queue_approve_all') {
     await interaction.deferUpdate();
     for (const item of queue.items) {
       if (item.status === 'pending' || item.status === 'rejected') {
@@ -275,9 +336,9 @@ export async function handlePromotionQueueInteraction(interaction) {
   }
 
   // Handle reject all
-  if (interaction.isButton() && customId.startsWith('prom_queue_reject_')) {
+  if (interaction.isButton() && customId === 'prom_queue_reject_all') {
     const modal = new ModalBuilder()
-      .setCustomId(`prom_queue_reject_all_${ownerId}_${Date.now()}`)
+      .setCustomId('prom_queue_reject_all_modal')
       .setTitle('❌ رفض الكل — السبب العام');
     modal.addComponents(
       new ActionRowBuilder().addComponents(
@@ -294,7 +355,7 @@ export async function handlePromotionQueueInteraction(interaction) {
   }
 
   // Handle submit
-  if (interaction.isButton() && customId.startsWith('prom_queue_submit_')) {
+  if (interaction.isButton() && customId === 'prom_queue_submit') {
     await interaction.deferUpdate();
     const approved = queue.items.filter(item => item.status === 'approved');
     const rejected = queue.items.filter(item => item.status === 'rejected');
@@ -303,41 +364,44 @@ export async function handlePromotionQueueInteraction(interaction) {
       return interaction.followUp({ content: '❌ لا يوجد أعضاء مقبولين للإرسال.', flags: MessageFlags.Ephemeral });
     }
 
-    // Apply promotions (skip individual announcements)
     const applied = [];
     const errors = [];
-    for (const item of approved) {
-      try {
-        const m = await Member.findOne({ discordId: item.m.discordId });
-        const gm = await interaction.guild.members.fetch(item.m.discordId).catch(() => null);
-        if (!m || !gm) { errors.push(item.m.discordId); continue; }
-        await applyPromotion({
-          memberData: m, guildMember: gm,
-          newRank: item.nextRank, newRankIndex: item.nextRankIndex,
-          promoterId: interaction.user.id, promoterName: interaction.user.tag,
-          guild: interaction.guild,
-          options: { type: 'ترقية (موافقة على طلب)', skipAnnouncement: true }
-        });
-        applied.push(item);
-      } catch (e) {
-        console.error(`[Promotion] ${item.m.discordId} error:`, e.message);
-        errors.push(item.m.discordId);
+    try {
+      const guild = await interaction.client.guilds.fetch(queue.guildId).catch(() => interaction.guild);
+      if (!guild) return;
+
+      for (const item of approved) {
+        try {
+          const m = await Member.findOne({ discordId: item.m.discordId });
+          const gm = await guild.members.fetch(item.m.discordId).catch(() => null);
+          if (!m || !gm) { errors.push(item.m.discordId); continue; }
+          await applyPromotion({
+            memberData: m, guildMember: gm,
+            newRank: item.nextRank, newRankIndex: item.nextRankIndex,
+            promoterId: interaction.user.id, promoterName: interaction.user.tag,
+            guild,
+            options: { type: 'ترقية (موافقة على طلب)', skipAnnouncement: true }
+          });
+          applied.push(item);
+        } catch (e) {
+          console.error(`[Promotion] ${item.m.discordId} error:`, e.message);
+          errors.push(item.m.discordId);
+        }
       }
+    } catch (e) {
+      console.error('[Promotion] فشل الوصول للسيرفر:', e.message);
     }
 
-    // Send bulk announcement
     if (applied.length > 0) {
       await sendBulkAnnouncement(interaction.guild, applied, interaction.user.tag);
     }
 
-    // Log rejections
     const { logPromotionAction } = await import('../utils/promotionManager.js');
     for (const item of rejected) {
       await logPromotionAction(interaction.guild, 'reject', item.m.discordId, interaction.user.id,
         `السبب: ${item.reason || 'عام'}\nرفض من قائمة الانتظار`);
     }
 
-    // Clean up
     activeQueues.delete(queueMsgId);
 
     const embed = embedCustom(0x2ECC71, '📨 تم إرسال الترقيات',
@@ -352,8 +416,10 @@ export async function handlePromotionQueueInteraction(interaction) {
 
   // Handle individual approve
   if (interaction.isButton() && customId.startsWith('prom_queue_item_approve_')) {
+    const parts = customId.split('_');
+    const index = parseInt(parts[parts.length - 1]);
+    if (isNaN(index)) return;
     await interaction.deferUpdate();
-    const index = parseInt(parts[5]);
     if (queue.items[index]) {
       queue.items[index].status = 'approved';
       queue.items[index].reason = '';
@@ -364,9 +430,11 @@ export async function handlePromotionQueueInteraction(interaction) {
 
   // Handle individual reject (opens modal)
   if (interaction.isButton() && customId.startsWith('prom_queue_item_reject_')) {
-    const index = parseInt(parts[5]);
+    const parts = customId.split('_');
+    const index = parseInt(parts[parts.length - 1]);
+    if (isNaN(index)) return;
     const modal = new ModalBuilder()
-      .setCustomId(`prom_queue_reject_item_${ownerId}_${index}_${Date.now()}`)
+      .setCustomId(`prom_queue_reject_item_modal_${index}`)
       .setTitle('❌ رفض العضو');
     modal.addComponents(
       new ActionRowBuilder().addComponents(
@@ -387,15 +455,27 @@ export async function handlePromotionQueueModal(interaction) {
   if (!interaction.isModalSubmit()) return;
   const { customId, user } = interaction;
 
-  // Find queue owned by this user
+  if (!hasPromotionPermission(interaction.member)) {
+    return interaction.reply({ content: '❌ لا تملك صلاحية التفاعل مع قائمة الترقيات.', flags: MessageFlags.Ephemeral });
+  }
+
   let queue = null;
   for (const [, q] of activeQueues) {
     if (q.ownerId === user.id) { queue = q; break; }
   }
+  if (!queue) {
+    const cfg = loadConfig();
+    const promRole = cfg.committees?.list?.promotion?.roles?.manager?.[0];
+    if (promRole && interaction.member.roles?.cache?.has(promRole)) {
+      for (const [, q] of activeQueues) {
+        queue = q; break;
+      }
+    }
+  }
   if (!queue) return interaction.reply({ content: '❌ انتهت صلاحية الجلسة.', flags: MessageFlags.Ephemeral });
 
   // Reject all modal
-  if (customId.startsWith('prom_queue_reject_all_')) {
+  if (customId === 'prom_queue_reject_all_modal') {
     const reason = interaction.fields.getTextInputValue('prom_queue_reject_all_reason');
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     for (const item of queue.items) {
@@ -410,8 +490,9 @@ export async function handlePromotionQueueModal(interaction) {
   }
 
   // Reject item modal
-  if (customId.startsWith('prom_queue_reject_item_')) {
-    const index = parseInt(customId.split('_')[6]);
+  if (customId.startsWith('prom_queue_reject_item_modal_')) {
+    const parts = customId.split('_');
+    const index = parseInt(parts[parts.length - 1]);
     const reason = interaction.fields.getTextInputValue('prom_queue_reject_item_reason');
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (queue.items[index]) {

@@ -661,7 +661,7 @@ async function handleWarningModal(interaction) {
 
   if (matchedType.type === 'oral') {
     if (announcementChannel) {
-      await announcementChannel.send({ content: warningGif }).catch(() => {});
+      await announcementChannel.send({ content: warningGif }).catch(e => console.error(`[CommitteePanel] فشل إرسال GIF تحذير شفوي:`, e.message));
       const oralDecision = `
 ▬▬▬ ﷽ ▬▬▬
 <:Family:1516647836744417320> **قرار إداري صادر من قيادة العائلة** 𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 
@@ -678,7 +678,7 @@ async function handleWarningModal(interaction) {
 
 ||<@&${basicRoleId}>||
 ▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
-      await announcementChannel.send({ content: oralDecision }).catch(() => {});
+      await announcementChannel.send({ content: oralDecision }).catch(e => console.error(`[CommitteePanel] فشل إرسال قرار تحذير شفوي:`, e.message));
     }
 
     const dmEmbed = embedWarning('⚠️ تنبيه شفوي',
@@ -712,7 +712,7 @@ async function handleWarningModal(interaction) {
   }
 
   if (announcementChannel) {
-    await announcementChannel.send({ content: warningGif }).catch(() => {});
+    await announcementChannel.send({ content: warningGif }).catch(e => console.error(`[CommitteePanel] فشل إرسال GIF إنذار رسمي:`, e.message));
     const decision = `
 ▬▬▬ ﷽ ▬▬▬
 <:Family:1516647836744417320> **قرار إداري صادر من قيادة العائلة** 𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 
@@ -730,7 +730,7 @@ async function handleWarningModal(interaction) {
 
 ||<@&${basicRoleId}>||
 ▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
-    await announcementChannel.send({ content: decision }).catch(() => {});
+    await announcementChannel.send({ content: decision }).catch(e => console.error(`[CommitteePanel] فشل إرسال قرار إنذار:`, e.message));
   }
 
   const dmEmbed = embedError(`⚠️ تحذير رسمي (${numArabic})`,
@@ -804,10 +804,10 @@ async function executeRemoveWarning(interaction, targetUserId, targetUser, warn,
   const gm = await interaction.guild.members.fetch(targetUserId).catch(() => null);
   if (gm) {
     const roles = Object.values(config.warnings?.roles || {}).filter(id => id);
-    for (const r of roles) await gm.roles.remove(r).catch(() => {});
+    for (const r of roles) await gm.roles.remove(r).catch(e => console.error(`[CommitteePanel] فشل إزالة رول تحذير ${r} من ${targetUserId}:`, e.message));
     const count = await (await getWarningModel()).countDocuments({ memberId: targetUserId, removed: false });
     const nextRole = config.warnings?.roles?.[count.toString()];
-    if (nextRole) await gm.roles.add(nextRole).catch(() => {});
+    if (nextRole) await gm.roles.add(nextRole).catch(e => console.error(`[CommitteePanel] فشل إضافة رول ${nextRole} لـ ${targetUserId}:`, e.message));
   }
 
   await dmUser(targetUser, embedSuccess('✅ تم إلغاء تحذيرك',
@@ -900,12 +900,12 @@ async function executeFire(interaction, userIds, reason) {
         }
         const uniqueRoleIds = [...new Set(rolesToRemove.filter(Boolean))];
         const existing = uniqueRoleIds.filter(rid => discordMember.roles.cache.has(rid));
-        if (existing.length > 0) await discordMember.roles.remove(existing).catch(() => {});
+        if (existing.length > 0) await discordMember.roles.remove(existing).catch(e => console.error(`[CommitteePanel] فشل إزالة رولات ${userId} أثناء الفصل:`, e.message));
 
         const channelId = memberRecord?.roomChannelId;
         if (channelId) {
           const roomChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
-          if (roomChannel && roomChannel.deletable) await roomChannel.delete().catch(() => {});
+          if (roomChannel && roomChannel.deletable) await roomChannel.delete().catch(e => console.error(`[CommitteePanel] فشل حذف روم ${channelId} للعضو ${userId}:`, e.message));
         }
       }
 
@@ -944,7 +944,7 @@ async function executeFire(interaction, userIds, reason) {
     const annChannelId = config.general?.channels?.announcements?.id || '1391985954075443282';
     const annChannel = interaction.guild.channels.cache.get(annChannelId) || await interaction.guild.channels.fetch(annChannelId).catch(() => null);
     if (annChannel) {
-      await annChannel.send({ content: 'https://media.discordapp.net/attachments/1391704768660901919/1453017755392671899/934_x_175_.gif' }).catch(() => {});
+      await annChannel.send({ content: 'https://media.discordapp.net/attachments/1391704768660901919/1453017755392671899/934_x_175_.gif' }).catch(e => console.error(`[CommitteePanel] فشل إرسال GIF قرار الفصل:`, e.message));
       const totalWarningsRemoved = warningsStats.reduce((sum, stat) => sum + stat.count, 0);
       const decision = `
 ****قرار صادر من قيادة 𓆩 <:Family:1516647836744417320> 𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪****
@@ -961,7 +961,7 @@ ${totalWarningsRemoved > 0 ? `\n**تم إزالة ${totalWarningsRemoved} تحذ
 **امضاء لجنة العقوبات:** <@&1398212916389478442>
 
 **▬▬▬▬▬▬▬▬  𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘 𓆪 ▬▬▬▬▬▬▬▬`.trim();
-      await annChannel.send({ content: decision }).catch(() => {});
+      await annChannel.send({ content: decision }).catch(e => console.error(`[CommitteePanel] فشل إرسال قرار الفصل:`, e.message));
     }
   }
 
@@ -1065,8 +1065,8 @@ async function executeBlacklist(interaction, pending) {
 
   const memberGuild = interaction.guild.members.cache.get(targetUserId);
   if (memberGuild) {
-    if (config.roles?.blacklist?.id) await memberGuild.roles.add(config.roles.blacklist.id).catch(() => {});
-    if (config.roles?.basic?.id) await memberGuild.roles.remove(config.roles.basic.id).catch(() => {});
+    if (config.roles?.blacklist?.id) await memberGuild.roles.add(config.roles.blacklist.id).catch(e => console.error(`[CommitteePanel] فشل إضافة بلاك ليست لـ ${targetUserId}:`, e.message));
+    if (config.roles?.basic?.id) await memberGuild.roles.remove(config.roles.basic.id).catch(e => console.error(`[CommitteePanel] فشل إزالة رتبة أساسي من ${targetUserId}:`, e.message));
   }
 
   const targetUser = interaction.client.users.cache.get(targetUserId);

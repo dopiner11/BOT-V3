@@ -14,6 +14,7 @@
     "@convex-dev/auth": "^0.0.80",
     "@discordjs/voice": "^0.19.2",
     "@distube/yt-dlp": "^2.0.1",
+    "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.13.4",
     "clsx": "^2.1.1",
     "convex": "^1.24.2",
@@ -47,7 +48,6 @@
     "tailwindcss": "~3",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "^6.2.0",
-    "yt-dlp-wrap": "^2.3.12"
+    "vite": "^6.2.0"
   }
 }

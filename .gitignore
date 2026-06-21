@@ -32,3 +32,6 @@ data/
 >>>>>>> fc924408617c21f5c9f448279bc0a6fb3965aaa1
 # Ignored for the template, you probably want to remove it:
 package-lock.json
+
+# ytdl-core cache
+*-player-script.js

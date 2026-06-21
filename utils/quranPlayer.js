@@ -297,21 +297,10 @@ async function fetchPlaylistVideoIds(playlistId) {
 }
 
 // ─── Audio Resolution ────────────────────────────────────────────
-// Strategy: @distube/ytdl-core (pure JS) → yt-dlp subprocess (fallback)
+// Strategy: yt-dlp subprocess (reliable, tested 200 OK)
+//           → @distube/ytdl-core (reserve, decipher may be broken)
 async function getAudioStream(videoId) {
-  // ── Strategy 1: @distube/ytdl-core (pure JS, no binary) ─────────
-  try {
-    const stream = await ytdl(`https://www.youtube.com/watch?v=${videoId}`, {
-      filter: 'audioonly',
-      quality: 'highestaudio',
-    });
-    console.log('[QuranPlayer] ytdl-core resolved for', videoId);
-    return stream;
-  } catch (err) {
-    console.warn('[QuranPlayer] ytdl-core failed for', videoId + ':', err.message);
-  }
-
-  // ── Strategy 2: yt-dlp subprocess (binary fallback) ─────────────
+  // ── Strategy 1: yt-dlp subprocess ───────────────────────────────
   if (_ytdlpBin) {
     try {
       const args = [
@@ -325,17 +314,37 @@ async function getAudioStream(videoId) {
       const { stdout } = await execFileAsync(_ytdlpBin, args, { timeout: 30000 });
       const audioUrl = stdout.trim();
       if (audioUrl) {
-        console.log('[QuranPlayer] yt-dlp subprocess resolved URL for', videoId);
         const res = await fetch(audioUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           signal: AbortSignal.timeout(15000),
         });
-        if (res.ok && res.body) return Readable.fromWeb(res.body);
-        console.warn('[QuranPlayer] yt-dlp URL fetch failed:', res.status);
+        if (res.ok && res.body) {
+          console.log('[QuranPlayer] yt-dlp resolved', videoId);
+          return Readable.fromWeb(res.body);
+        }
+        console.warn('[QuranPlayer] yt-dlp URL fetch:', res.status);
       }
     } catch (err) {
-      console.warn('[QuranPlayer] yt-dlp subprocess failed for', videoId + ':', (err.stderr || err.message || '').split('\n').pop());
+      console.warn('[QuranPlayer] yt-dlp failed for', videoId + ':', (err.stderr || err.message || '').split('\n').pop());
     }
+  }
+
+  // ── Strategy 2: @distube/ytdl-core (pure JS, decipher may be broken) ─
+  try {
+    const stream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, {
+      filter: 'audioonly',
+    });
+    // Validate: try to read first byte
+    const ok = await Promise.race([
+      new Promise((resolve, reject) => {
+        stream.once('data', () => resolve(true));
+        stream.once('error', reject);
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('ytdl-core stream timeout')), 8000)),
+    ]);
+    if (ok) return stream;
+  } catch (err) {
+    console.warn('[QuranPlayer] ytdl-core failed for', videoId + ':', err.message);
   }
 
   throw new Error('All audio sources failed for ' + videoId);

@@ -354,10 +354,33 @@ async function fetchPlaylistVideoIds(playlistId) {
   return result;
 }
 
+// ─── Piped.video API (fallback when Invidious returns 403) ─────
+const PIPED_API = 'https://pipedapi.kavin.rocks';
+async function fetchViaPiped(videoId) {
+  try {
+    const res = await fetch(`${PIPED_API}/streams/${videoId}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error('Piped HTTP ' + res.status);
+    const data = await res.json();
+    const audios = data.audioStreams || [];
+    audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+    const best = audios.find(a => a.mimeType?.includes('webm')) || audios[0];
+    if (best?.url) return best.url;
+    // Fallback to video streams + extract audio
+    const videos = data.videoStreams || [];
+    const vid = videos.find(v => v.mimeType?.includes('webm')) || videos[0];
+    if (vid?.url) return vid.url;
+    throw new Error('No audio stream found in Piped response');
+  } catch (err) {
+    throw new Error('Piped failed: ' + (err.message || err));
+  }
+}
+
 // Get a streamable audio URL for a YouTube video ID
-// Strategy: 1) yt-dlp (with cookies if available), 2) Invidious proxy, 3) yt-dlp fallback search
+// Strategy: yt-dlp → Invidious proxy → Piped API → yt-dlp fallback search
 async function getAudioUrlFromInvidious(videoId, fallbackSearchTerm = null) {
-  // Check cache
   const cached = streamUrlCache.get(videoId);
   if (cached && Date.now() < cached.expires) return cached.url;
 
@@ -370,13 +393,11 @@ async function getAudioUrlFromInvidious(videoId, fallbackSearchTerm = null) {
         `https://www.youtube.com/watch?v=${videoId}`,
         '--format', 'bestaudio[ext=webm]/bestaudio/best',
         '--no-playlist',
-        '--js-runtimes', 'node',
       ];
       if (_hasCookies) args.push('--cookies', _cookiesPath);
 
       const info = await _ytDlp.getVideoInfo(args);
       if (info?.url) {
-        // Cache for 5 hours (googlevideo URLs expire in ~6h)
         streamUrlCache.set(videoId, { url: info.url, expires: Date.now() + 5 * 3600 * 1000 });
         console.log('[QuranPlayer] yt-dlp resolved audio URL for', videoId);
         return info.url;
@@ -396,15 +417,26 @@ async function getAudioUrlFromInvidious(videoId, fallbackSearchTerm = null) {
       let url = audios[0].url;
       if (url.startsWith('/')) url = instanceUrl + url;
       streamUrlCache.set(videoId, { url, expires: Date.now() + 4 * 3600 * 1000 });
-      console.log('[QuranPlayer] Invidious resolved audio URL via', instanceUrl, 'for', videoId);
+      console.log('[QuranPlayer] Invidious proxy resolved for', videoId, 'via', instanceUrl);
       return url;
     }
   } catch (err) {
     lastError = err;
-    console.warn('[QuranPlayer] Invidious failed for', videoId + ':', err.message);
+    console.warn('[QuranPlayer] Invidious proxy failed for', videoId + ':', err.message);
   }
 
-  // ── Strategy 3: yt-dlp Fallback Search ──────────────────────────
+  // ── Strategy 3: Piped API direct ───────────────────────────────
+  try {
+    const url = await fetchViaPiped(videoId);
+    streamUrlCache.set(videoId, { url, expires: Date.now() + 3 * 3600 * 1000 });
+    console.log('[QuranPlayer] Piped resolved for', videoId);
+    return url;
+  } catch (err) {
+    lastError = err;
+    console.warn('[QuranPlayer] Piped failed for', videoId + ':', err.message);
+  }
+
+  // ── Strategy 4: yt-dlp fallback search ─────────────────────────
   if (fallbackSearchTerm && _ytDlp) {
     console.log('[QuranPlayer] Attempting fallback search for:', fallbackSearchTerm);
     try {
@@ -412,24 +444,24 @@ async function getAudioUrlFromInvidious(videoId, fallbackSearchTerm = null) {
         `ytsearch1:${fallbackSearchTerm}`,
         '--format', 'bestaudio[ext=webm]/bestaudio/best',
         '--no-playlist',
-        '--js-runtimes', 'node',
       ];
       if (_hasCookies) args.push('--cookies', _cookiesPath);
 
       const info = await _ytDlp.getVideoInfo(args);
       if (info?.url) {
-        // Cache the fallback URL for this videoId so we don't search again for 12 hours
         streamUrlCache.set(videoId, { url: info.url, expires: Date.now() + 12 * 3600 * 1000 });
-        console.log('[QuranPlayer] Fallback search succeeded for', fallbackSearchTerm, '-> ID:', info.id);
+        console.log('[QuranPlayer] Fallback search succeeded for', fallbackSearchTerm);
         return info.url;
       }
     } catch (err) {
-      console.error('[QuranPlayer] Fallback search failed:', err.message?.split('\n').pop());
+      console.warn('[QuranPlayer] Fallback search failed:', err.message?.split('\n').pop());
     }
   }
 
-  throw lastError || new Error('Failed to resolve audio URL for videoId ' + videoId);
+  throw lastError || new Error('Failed to resolve audio URL for ' + videoId);
 }
+
+
 
 function extractVideoId(url) {
   if (!url) return null;

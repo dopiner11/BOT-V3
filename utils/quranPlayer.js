@@ -1,4 +1,4 @@
-import { createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior, VoiceConnectionStatus, StreamType, joinVoiceChannel, entersState } from '@discordjs/voice';
+import { createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior, VoiceConnectionStatus, StreamType, joinVoiceChannel, entersState, getVoiceConnection } from '@discordjs/voice';
 import { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { loadConfig } from './configLoader.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -367,7 +367,7 @@ function savePlayerState(player) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     const state = {
       guildId: player.guildId,
-      voiceChannelId: player.voiceConnection.joinConfig.channelId,
+      voiceChannelId: player.voiceConnection?.joinConfig?.channelId || null,
       textChannelId: player.textChannel.id,
       messageId: player.message?.id || null,
       contentType: player.contentType,
@@ -658,21 +658,24 @@ class QuranPlayer {
     );
     rows.push(ctrlRow);
 
-    const modeRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('qp_autoplay').setEmoji('🔀').setLabel(this.autoPlay ? 'تشغيل تلقائي' : 'يدوي').setStyle(this.autoPlay ? ButtonStyle.Success : ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('qp_vol_down').setEmoji('🔉').setLabel(volPercent + '%').setStyle(ButtonStyle.Secondary).setDisabled(this.volume <= VOLUME_MIN),
-      new ButtonBuilder().setCustomId('qp_vol_up').setEmoji('🔊').setStyle(ButtonStyle.Secondary).setDisabled(this.volume >= VOLUME_MAX),
-    );
-    rows.push(modeRow);
-
+    const modeRow = new ActionRowBuilder();
     if (this.contentType === 'quran') {
       const totalPages = surahPageCount();
-      const pageRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('qp_page_prev').setEmoji('◀️').setLabel('السابق').setStyle(ButtonStyle.Secondary).setDisabled(this.page <= 0),
-        new ButtonBuilder().setCustomId('qp_page_next').setEmoji('▶️').setLabel('التالي').setStyle(ButtonStyle.Secondary).setDisabled(this.page >= totalPages - 1),
+      modeRow.addComponents(
+        new ButtonBuilder().setCustomId('qp_page_prev').setEmoji('◀️').setStyle(ButtonStyle.Secondary).setDisabled(this.page <= 0),
+        new ButtonBuilder().setCustomId('qp_vol_down').setEmoji('🔉').setLabel(volPercent + '%').setStyle(ButtonStyle.Secondary).setDisabled(this.volume <= VOLUME_MIN),
+        new ButtonBuilder().setCustomId('qp_vol_up').setEmoji('🔊').setStyle(ButtonStyle.Secondary).setDisabled(this.volume >= VOLUME_MAX),
+        new ButtonBuilder().setCustomId('qp_page_next').setEmoji('▶️').setStyle(ButtonStyle.Secondary).setDisabled(this.page >= totalPages - 1),
+        new ButtonBuilder().setCustomId('qp_autoplay').setEmoji('🔀').setLabel(this.autoPlay ? 'تلقائي' : 'يدوي').setStyle(this.autoPlay ? ButtonStyle.Success : ButtonStyle.Secondary),
       );
-      rows.push(pageRow);
+    } else {
+      modeRow.addComponents(
+        new ButtonBuilder().setCustomId('qp_vol_down').setEmoji('🔉').setLabel(volPercent + '%').setStyle(ButtonStyle.Secondary).setDisabled(this.volume <= VOLUME_MIN),
+        new ButtonBuilder().setCustomId('qp_vol_up').setEmoji('🔊').setStyle(ButtonStyle.Secondary).setDisabled(this.volume >= VOLUME_MAX),
+        new ButtonBuilder().setCustomId('qp_autoplay').setEmoji('🔀').setLabel(this.autoPlay ? 'تلقائي' : 'يدوي').setStyle(this.autoPlay ? ButtonStyle.Success : ButtonStyle.Secondary),
+      );
     }
+    rows.push(modeRow);
 
     return rows;
   }
@@ -1148,7 +1151,11 @@ async function ensurePlayer(guildId, client, textChannel) {
     let msgExists = false;
     if (existing.message) {
       const msg = await existing.textChannel.messages.fetch(existing.message.id).catch(() => null);
-      if (msg) msgExists = true;
+      if (msg) {
+        msgExists = true;
+      } else {
+        existing.message = null;
+      }
     }
 
     if (!msgExists) {
@@ -1161,8 +1168,8 @@ async function ensurePlayer(guildId, client, textChannel) {
   const voiceChannelId = config.general?.voiceChannelId?.id;
   const playerChannelId = config.general?.playerChannelId;
 
-  if (!voiceChannelId || !playerChannelId) {
-    console.warn('[QuranPlayer] voiceChannelId or playerChannelId not configured');
+  if (!playerChannelId) {
+    console.warn('[QuranPlayer] playerChannelId not configured');
     return null;
   }
 
@@ -1174,24 +1181,35 @@ async function ensurePlayer(guildId, client, textChannel) {
       return null;
     }
 
-    const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
-    if (!channel || channel.type !== 2) {
-      console.warn('[QuranPlayer] voiceChannel not found or not voice type:', voiceChannelId);
-      return null;
+    // Reuse existing voice connection (created by ensureVoiceConnection in index.js)
+    let vc = getVoiceConnection(guildId);
+
+    if (!vc || vc.state.status === VoiceConnectionStatus.Destroyed) {
+      if (!voiceChannelId) {
+        console.warn('[QuranPlayer] voiceChannelId not configured and no existing connection');
+        return null;
+      }
+      const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
+      if (!channel || channel.type !== 2) {
+        console.warn('[QuranPlayer] voiceChannel not found or not voice type:', voiceChannelId);
+        return null;
+      }
+
+      vc = joinVoiceChannel({
+        channelId: channel.id,
+        guildId: channel.guild.id,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+        selfDeaf: true,
+      });
     }
 
-    const vc = joinVoiceChannel({
-      channelId: channel.id,
-      guildId: channel.guild.id,
-      adapterCreator: channel.guild.voiceAdapterCreator,
-      selfDeaf: true,
-    });
-
-    await entersState(vc, VoiceConnectionStatus.Ready, 10_000).catch(() => null);
+    // Wait for voice to be ready if not already
     if (vc.state.status !== VoiceConnectionStatus.Ready) {
-      console.warn('[QuranPlayer] Voice connection timeout');
-      vc.destroy();
-      return null;
+      await entersState(vc, VoiceConnectionStatus.Ready, 15_000).catch(() => null);
+    }
+
+    if (vc.state.status !== VoiceConnectionStatus.Ready) {
+      console.warn('[QuranPlayer] Voice not ready yet, but proceeding to send embed anyway');
     }
 
     let savedState = null;

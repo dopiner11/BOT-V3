@@ -178,6 +178,8 @@ client.once(Events.ClientReady, async () => {
       startExcuseNotifications(client);
       startVoteExpiryChecker(client);
       startDailyChallenge(client);
+      const { initQuranPlayer } = await import('./utils/quranPlayer.js');
+      initQuranPlayer(client);
       const { init: initCompetitions } = await import('./commands/competition.js');
       await initCompetitions(client).catch(e => console.error('[Index] competitions:', e?.message));
       const { restoreNominations } = await import('./commands/nomination.js');

@@ -918,5 +918,19 @@
       "قرارات اللجنة نهائية ولا تقبل الطعن",
       "سيتم الإعلان عن النتائج فور انتهاء المسابقة"
     ]
+  },
+  "quran": {
+    "reciters": [
+      {
+        "id": "basit",
+        "name": "عبد الباسط عبد الصمد",
+        "baseUrl": "https://server7.mp3quran.net/basit"
+      },
+      {
+        "id": "amer_al_kathimi",
+        "name": "عامر الكاظمي",
+        "youtubePlaylistId": "PLQ6xMvrA8-AIGiyV4r6lzSJ2tKPtJOvpC"
+      }
+    ]
   }
 }

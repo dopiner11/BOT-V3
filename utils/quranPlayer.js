@@ -312,11 +312,20 @@ async function fetchPlaylistVideoIds(playlistId) {
 }
 
 // ─── Audio Resolution ────────────────────────────────────────────
-// Multi-method chain: yt-dlp (binary/path/python) → @distube/ytdl-core
+// Chain: Lavalink (Java, dev.lavalink.youtube) → yt-dlp → ytdl-core
 async function getAudioStream(videoId) {
   const errors = [];
 
-  // ── Strategy 1: yt-dlp via any available method ─────────────────
+  // ── Strategy 1: Lavalink (Java YouTube source, same as JMusicBot) ─
+  try {
+    const { getAudioStream: lavalinkStream } = await import('./lavalinkManager.js');
+    const stream = await lavalinkStream(videoId);
+    if (stream) return stream;
+  } catch (err) {
+    errors.push('lavalink: ' + (err.message || '').slice(0, 80));
+  }
+
+  // ── Strategy 2: yt-dlp via any available method ─────────────────
   const baseArgs = [
     '--format', 'bestaudio[ext=webm]/bestaudio/best',
     '--no-playlist', '--no-warnings', '-g',

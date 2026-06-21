@@ -178,6 +178,10 @@ client.once(Events.ClientReady, async () => {
       startExcuseNotifications(client);
       startVoteExpiryChecker(client);
       startDailyChallenge(client);
+      // Start Lavalink (Java YouTube source) in background
+      import('./utils/lavalinkManager.js').then(m =>
+        m.start().catch(e => console.error('[Lavalink] startup:', e?.message))
+      );
       const { initQuranPlayer } = await import('./utils/quranPlayer.js');
       initQuranPlayer(client);
       const { init: initCompetitions } = await import('./commands/competition.js');

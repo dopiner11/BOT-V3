@@ -35,3 +35,6 @@ package-lock.json
 
 # ytdl-core cache
 *-player-script.js
+# Lavalink
+/lavalink/Lavalink.jar
+/lavalink/plugins/

@@ -150,79 +150,87 @@ function getReciters() {
 
 const ITEMS_PER_PAGE = 25;
 
-const CUSTOM_AUDIO_DATA = {
-  duas: [
-    {
-      id: 'dua_kumayl',
-      name: 'دعاء كميل',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=fH_M44k6G4I' }
-      ]
-    },
-    {
-      id: 'dua_tawassul',
-      name: 'دعاء التوسل',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=1F_47Z4pE6I' },
-        { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=A1qM5UzoMkE' }
-      ]
-    },
-    {
-      id: 'dua_nudba',
-      name: 'دعاء الندبة',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=t18WJ35QZ3I' }
-      ]
-    },
-    {
-      id: 'dua_ahd',
-      name: 'دعاء العهد',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=2TzC7s927_U' },
-        { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=GMEvyA7TLH0' }
-      ]
-    }
-  ],
-  ziyarat: [
-    {
-      id: 'ziyarat_ashura',
-      name: 'زيارة عاشوراء',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=6v7a88Xk0zY' },
-        { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=GG2McMgU2Co' }
-      ]
-    },
-    {
-      id: 'ziyarat_warith',
-      name: 'زيارة وارث',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=7X5C7Qd2Cis' }
-      ]
-    },
-    {
-      id: 'ziyarat_jamia',
-      name: 'الزيارة الجامعة',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=J2BsWq5BvVs' },
-        { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=7Dq3jfHFiYI' }
-      ]
-    },
-    {
-      id: 'ziyarat_ameen_allah',
-      name: 'زيارة أمين الله',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=1eJ422d3Z_E' }
-      ]
-    },
-    {
-      id: 'ziyarat_ale_yasin',
-      name: 'زيارة آل ياسين',
-      reciters: [
-        { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=0hK2x9zK97E' }
-      ]
-    }
-  ]
-};
+function getCustomAudioData() {
+  const config = loadConfig();
+  const defaults = {
+    duas: [
+      {
+        id: 'dua_kumayl',
+        name: 'دعاء كميل',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=fH_M44k6G4I' }
+        ]
+      },
+      {
+        id: 'dua_tawassul',
+        name: 'دعاء التوسل',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=1F_47Z4pE6I' },
+          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=A1qM5UzoMkE' }
+        ]
+      },
+      {
+        id: 'dua_nudba',
+        name: 'دعاء الندبة',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=t18WJ35QZ3I' }
+        ]
+      },
+      {
+        id: 'dua_ahd',
+        name: 'دعاء العهد',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=2TzC7s927_U' },
+          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=GMEvyA7TLH0' }
+        ]
+      }
+    ],
+    ziyarat: [
+      {
+        id: 'ziyarat_ashura',
+        name: 'زيارة عاشوراء',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=6v7a88Xk0zY' },
+          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=GG2McMgU2Co' }
+        ]
+      },
+      {
+        id: 'ziyarat_warith',
+        name: 'زيارة وارث',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=7X5C7Qd2Cis' }
+        ]
+      },
+      {
+        id: 'ziyarat_jamia',
+        name: 'الزيارة الجامعة',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=J2BsWq5BvVs' },
+          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=7Dq3jfHFiYI' }
+        ]
+      },
+      {
+        id: 'ziyarat_ameen_allah',
+        name: 'زيارة أمين الله',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=1eJ422d3Z_E' }
+        ]
+      },
+      {
+        id: 'ziyarat_ale_yasin',
+        name: 'زيارة آل ياسين',
+        reciters: [
+          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=0hK2x9zK97E' }
+        ]
+      }
+    ]
+  };
+
+  const data = {};
+  data.duas = config.quran?.duas || defaults.duas;
+  data.ziyarat = config.quran?.ziyarat || defaults.ziyarat;
+  return data;
+}
 const STATE_PATH = new URL('../data/player-state.json', import.meta.url);
 
 function surahPageCount() {
@@ -315,6 +323,15 @@ function extractVideoId(url) {
   const re = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const match = url.match(re);
   return match ? match[1] : null;
+}
+
+function extractPlaylistId(input) {
+  if (!input) return null;
+  if (input.includes('list=')) {
+    const parts = input.split('list=')[1];
+    return parts.split('&')[0];
+  }
+  return input;
 }
 
 // ─── Stream URL → Readable stream ─────────────────
@@ -460,7 +477,8 @@ class QuranPlayer {
   async fetchPlaylist(playlistId) {
     try {
       if (!playlistId) return false;
-      const ids = await fetchPlaylistVideoIds(playlistId);
+      const cleanId = extractPlaylistId(playlistId);
+      const ids = await fetchPlaylistVideoIds(cleanId);
       // Store as { id: videoId } objects; audio URLs fetched on demand
       this.playlistVideos = ids.map((videoId, i) => ({ id: videoId, index: i }));
       if (this.contentType === 'quran' && this.queue.length === 0) {
@@ -479,7 +497,7 @@ class QuranPlayer {
     if (this.contentType === 'quran') {
       return getReciters()[this.reciterId]?.name || 'غير محدد';
     }
-    const items = this.contentType === 'dua' ? CUSTOM_AUDIO_DATA.duas : CUSTOM_AUDIO_DATA.ziyarat;
+    const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
     const item = items.find(it => it.name === this.currentItem);
     if (!item) return 'غير محدد';
     const rc = item.reciters.find(r => r.id === this.reciterId);
@@ -600,7 +618,7 @@ class QuranPlayer {
         .addOptions(reciterOptions);
       rows.push(new ActionRowBuilder().addComponents(reciterSelect));
     } else {
-      const items = this.contentType === 'dua' ? CUSTOM_AUDIO_DATA.duas : CUSTOM_AUDIO_DATA.ziyarat;
+      const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       const itemOptions = items.map(it => ({
         label: it.name,
         value: it.id,
@@ -659,7 +677,7 @@ class QuranPlayer {
     return rows;
   }
   getSelectedItemId() {
-    const items = this.contentType === 'dua' ? CUSTOM_AUDIO_DATA.duas : CUSTOM_AUDIO_DATA.ziyarat;
+    const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
     const item = items.find(it => it.name === this.currentItem);
     return item ? item.id : null;
   }
@@ -740,7 +758,7 @@ class QuranPlayer {
         url = reciter.baseUrl + '/' + String(surahId).padStart(3, '0') + '.mp3';
       }
     } else {
-      const items = this.contentType === 'dua' ? CUSTOM_AUDIO_DATA.duas : CUSTOM_AUDIO_DATA.ziyarat;
+      const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       const item = items.find(it => it.name === this.currentItem);
       if (!item) return;
       const reciterCfg = item.reciters.find(r => r.id === this.reciterId);
@@ -792,7 +810,7 @@ class QuranPlayer {
       }
       this.playUrl(url);
     } else {
-      const items = this.contentType === 'dua' ? CUSTOM_AUDIO_DATA.duas : CUSTOM_AUDIO_DATA.ziyarat;
+      const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       if (items.length === 0) return;
       const randomItem = items[Math.floor(Math.random() * items.length)];
       this.currentItem = randomItem.name;
@@ -833,6 +851,23 @@ class QuranPlayer {
   }
 
   async sendInitialEmbed() {
+    if (this.message) {
+      await this.message.delete().catch(() => {});
+    } else {
+      try {
+        if (existsSync(STATE_PATH)) {
+          const stateRaw = readFileSync(STATE_PATH, 'utf8');
+          if (stateRaw) {
+            const state = JSON.parse(stateRaw);
+            if (state && state.messageId) {
+              const oldMsg = await this.textChannel.messages.fetch(state.messageId).catch(() => null);
+              if (oldMsg) await oldMsg.delete().catch(() => {});
+            }
+          }
+        }
+      } catch {}
+    }
+
     const embed = this.buildEmbed();
     const components = await this.buildComponents();
     try {
@@ -867,7 +902,7 @@ class QuranPlayer {
   }
 
   setItem(itemId) {
-    const items = this.contentType === 'dua' ? CUSTOM_AUDIO_DATA.duas : CUSTOM_AUDIO_DATA.ziyarat;
+    const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
     const item = items.find(it => it.id === itemId);
     if (!item) return;
     this.currentItem = item.name;
@@ -977,6 +1012,17 @@ function isVoiceMember(interaction, player) {
 export async function handleQuranInteraction(interaction) {
   const guildId = interaction.guildId;
   let player = players.get(guildId);
+
+  if (interaction.isChatInputCommand()) {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+    player = await ensurePlayer(guildId, interaction.client, interaction.channel);
+    if (!player) {
+      return interaction.editReply('❌ تعذر تشغيل مشغل القرآن — الروم الصوتي غير مهيأ.');
+    }
+    return interaction.editReply('✅ تم تهيئة وتفعيل مشغل القرآن الكريم.');
+  }
 
   if (!player) {
     if (!interaction.deferred && !interaction.replied) {
@@ -1089,7 +1135,27 @@ export async function handleQuranInteraction(interaction) {
 
 async function ensurePlayer(guildId, client, textChannel) {
   const existing = players.get(guildId);
-  if (existing) return existing;
+  if (existing) {
+    if (textChannel && existing.textChannel.id !== textChannel.id) {
+      if (existing.message) {
+        await existing.message.delete().catch(() => {});
+      }
+      existing.textChannel = textChannel;
+      await existing.sendInitialEmbed();
+      return existing;
+    }
+
+    let msgExists = false;
+    if (existing.message) {
+      const msg = await existing.textChannel.messages.fetch(existing.message.id).catch(() => null);
+      if (msg) msgExists = true;
+    }
+
+    if (!msgExists) {
+      await existing.sendInitialEmbed();
+    }
+    return existing;
+  }
 
   const config = loadConfig();
   const voiceChannelId = config.general?.voiceChannelId?.id;

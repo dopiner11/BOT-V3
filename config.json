@@ -929,7 +929,78 @@
       {
         "id": "amer_al_kathimi",
         "name": "عامر الكاظمي",
-        "youtubePlaylistId": "PLQ6xMvrA8-AIGiyV4r6lzSJ2tKPtJOvpC"
+        "youtubePlaylistId": "https://youtube.com/playlist?list=PLQ6xMvrA8-AIGiyV4r6lzSJ2tKPtJOvpC&si=Ccn_wCnMuK0QgFou"
+      }
+    ],
+    "duas": [
+      {
+        "id": "dua_kumayl",
+        "name": "دعاء كميل",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=fH_M44k6G4I" }
+        ]
+      },
+      {
+        "id": "dua_tawassul",
+        "name": "دعاء التوسل",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=1F_47Z4pE6I" },
+          { "id": "mahmoud_sharifi", "name": "محمود شريفي", "url": "https://www.youtube.com/watch?v=A1qM5UzoMkE" }
+        ]
+      },
+      {
+        "id": "dua_nudba",
+        "name": "دعاء الندبة",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=t18WJ35QZ3I" }
+        ]
+      },
+      {
+        "id": "dua_ahd",
+        "name": "دعاء العهد",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=2TzC7s927_U" },
+          { "id": "mahmoud_sharifi", "name": "محمود شريفي", "url": "https://www.youtube.com/watch?v=GMEvyA7TLH0" }
+        ]
+      }
+    ],
+    "ziyarat": [
+      {
+        "id": "ziyarat_ashura",
+        "name": "زيارة عاشوراء",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=6v7a88Xk0zY" },
+          { "id": "mahmoud_sharifi", "name": "محمود شريفي", "url": "https://www.youtube.com/watch?v=GG2McMgU2Co" }
+        ]
+      },
+      {
+        "id": "ziyarat_warith",
+        "name": "زيارة وارث",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=7X5C7Qd2Cis" }
+        ]
+      },
+      {
+        "id": "ziyarat_jamia",
+        "name": "الزيارة الجامعة",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=J2BsWq5BvVs" },
+          { "id": "mahmoud_sharifi", "name": "محمود شريفي", "url": "https://www.youtube.com/watch?v=7Dq3jfHFiYI" }
+        ]
+      },
+      {
+        "id": "ziyarat_ameen_allah",
+        "name": "زيارة أمين الله",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=1eJ422d3Z_E" }
+        ]
+      },
+      {
+        "id": "ziyarat_ale_yasin",
+        "name": "زيارة آل ياسين",
+        "reciters": [
+          { "id": "basim_karbalai", "name": "باسم الكربلائي", "url": "https://www.youtube.com/watch?v=0hK2x9zK97E" }
+        ]
       }
     ]
   }

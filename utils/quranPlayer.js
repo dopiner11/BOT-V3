@@ -7,25 +7,40 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { gold as embedGold } from './embedStyles.js';
 import ytdl from '@distube/ytdl-core';
-import { execFile } from 'child_process';
+import { execFile, exec } from 'child_process';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
+const execAsync = promisify(exec);
 
-// ─── yt-dlp binary fallback (subprocess, NOT yt-dlp-wrap) ─────
+// ─── yt-dlp: multiple resolution methods ────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const _ytdlpCandidates = [
-  join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp'),
-  join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe'),
-  'yt-dlp',
-];
-let _ytdlpBin = null;
-for (const p of _ytdlpCandidates) {
-  if (existsSync(p)) { _ytdlpBin = p; break; }
-}
 const _cookiesPath = join(__dirname, '..', 'cookies.txt');
 const _hasCookies = existsSync(_cookiesPath);
-if (_ytdlpBin) console.log('[QuranPlayer] yt-dlp binary for fallback:', _ytdlpBin);
+
+// Build all possible yt-dlp invocation methods
+function getYtdlpCommands() {
+  const cmds = [];
+  // 1. Pre-built binary from @distube/yt-dlp
+  const bundled = join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp');
+  const bundledExe = join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+  if (existsSync(bundled)) {
+    cmds.push({ cmd: bundled, via: 'binary', method: 'execFile' });
+    cmds.push({ cmd: `"${bundled}"`, via: 'binary+shell', method: 'exec' }); // exec with shell
+  }
+  if (existsSync(bundledExe)) {
+    cmds.push({ cmd: bundledExe, via: 'binary.exe', method: 'execFile' });
+  }
+  // 2. yt-dlp on PATH
+  cmds.push({ cmd: 'yt-dlp', via: 'path', method: 'execFile' });
+  cmds.push({ cmd: 'yt-dlp', via: 'path+shell', method: 'exec' });
+  // 3. Python module
+  cmds.push({ cmd: 'python3', via: 'python3', args: ['-m', 'yt_dlp'], method: 'execFile' });
+  cmds.push({ cmd: 'python', via: 'python', args: ['-m', 'yt_dlp'], method: 'execFile' });
+  return cmds;
+}
+
+const _ytdlpCmds = getYtdlpCommands();
 
 const SURAHS = [
   { id: 1, name: 'الفاتحة', ayahCount: 7 },
@@ -297,56 +312,69 @@ async function fetchPlaylistVideoIds(playlistId) {
 }
 
 // ─── Audio Resolution ────────────────────────────────────────────
-// Strategy: yt-dlp subprocess (reliable, tested 200 OK)
-//           → @distube/ytdl-core (reserve, decipher may be broken)
+// Multi-method chain: yt-dlp (binary/path/python) → @distube/ytdl-core
 async function getAudioStream(videoId) {
-  // ── Strategy 1: yt-dlp subprocess ───────────────────────────────
-  if (_ytdlpBin) {
+  const errors = [];
+
+  // ── Strategy 1: yt-dlp via any available method ─────────────────
+  const baseArgs = [
+    '--format', 'bestaudio[ext=webm]/bestaudio/best',
+    '--no-playlist', '--no-warnings', '-g',
+  ];
+  if (_hasCookies) { baseArgs.push('--cookies', _cookiesPath); }
+
+  for (const entry of _ytdlpCmds) {
     try {
-      const args = [
-        `https://www.youtube.com/watch?v=${videoId}`,
-        '--format', 'bestaudio[ext=webm]/bestaudio/best',
-        '--no-playlist',
-        '--no-warnings',
-        '-g',
-      ];
-      if (_hasCookies) args.push('--cookies', _cookiesPath);
-      const { stdout } = await execFileAsync(_ytdlpBin, args, { timeout: 30000 });
-      const audioUrl = stdout.trim();
+      let stdout, stderr;
+      if (entry.method === 'exec') {
+        const shellCmd = entry.cmd + ' https://www.youtube.com/watch?v=' + videoId + ' ' + baseArgs.join(' ');
+        const result = await execAsync(shellCmd, { timeout: 25000, shell: true });
+        stdout = result.stdout;
+        stderr = result.stderr;
+      } else {
+        const args = entry.args ? [...entry.args, `https://www.youtube.com/watch?v=${videoId}`, ...baseArgs]
+                                : [`https://www.youtube.com/watch?v=${videoId}`, ...baseArgs];
+        const result = await execFileAsync(entry.cmd, args, { timeout: 25000 });
+        stdout = result.stdout;
+        stderr = result.stderr;
+      }
+      const audioUrl = (stdout || '').trim();
       if (audioUrl) {
         const res = await fetch(audioUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(12000),
         });
         if (res.ok && res.body) {
-          console.log('[QuranPlayer] yt-dlp resolved', videoId);
+          console.log('[QuranPlayer] yt-dlp(' + entry.via + ') resolved', videoId);
           return Readable.fromWeb(res.body);
         }
-        console.warn('[QuranPlayer] yt-dlp URL fetch:', res.status);
+        errors.push(entry.via + ': HTTP ' + res.status);
+      } else {
+        const reason = (stderr || 'empty stdout').split('\n').pop().trim().slice(0, 60);
+        errors.push(entry.via + ': ' + reason);
       }
     } catch (err) {
-      console.warn('[QuranPlayer] yt-dlp failed for', videoId + ':', (err.stderr || err.message || '').split('\n').pop());
+      const detail = err.stderr || err.message || err.code || String(err);
+      errors.push(entry.via + ': ' + detail.split('\n').pop().trim().slice(0, 80));
     }
   }
 
-  // ── Strategy 2: @distube/ytdl-core (pure JS, decipher may be broken) ─
+  // ── Strategy 2: @distube/ytdl-core ──────────────────────────────
   try {
-    const stream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, {
-      filter: 'audioonly',
-    });
-    // Validate: try to read first byte
+    const stream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' });
     const ok = await Promise.race([
       new Promise((resolve, reject) => {
         stream.once('data', () => resolve(true));
         stream.once('error', reject);
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('ytdl-core stream timeout')), 8000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('ytdl-core timeout')), 8000)),
     ]);
     if (ok) return stream;
   } catch (err) {
-    console.warn('[QuranPlayer] ytdl-core failed for', videoId + ':', err.message);
+    errors.push('ytdl-core: ' + (err.message || '').split('\n')[0].slice(0, 80));
   }
 
+  console.warn('[QuranPlayer] All methods failed for', videoId, ':', errors.join(' | '));
   throw new Error('All audio sources failed for ' + videoId);
 }
 

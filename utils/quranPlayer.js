@@ -318,8 +318,8 @@ async function getAudioStream(videoId) {
 
   // ── Strategy 1: Lavalink (Java YouTube source, same as JMusicBot) ─
   try {
-    const { getAudioStream: lavalinkStream } = await import('./lavalinkManager.js');
-    const stream = await lavalinkStream(videoId);
+    const { tryGetStream } = await import('./lavalinkManager.js');
+    const stream = await tryGetStream(videoId);
     if (stream) return stream;
   } catch (err) {
     errors.push('lavalink: ' + (err.message || '').slice(0, 80));

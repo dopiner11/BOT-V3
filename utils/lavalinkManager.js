@@ -1,8 +1,11 @@
-import { spawn } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { Readable } from 'stream';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -17,11 +20,11 @@ const HEADERS = { Authorization: LAVALINK_PASSWORD, 'Content-Type': 'application
 
 let lavalinkProcess = null;
 let ready = false;
+let failed = false;
 let readyResolve = null;
-const readyPromise = new Promise((resolve) => { readyResolve = resolve; });
-
+let readyReject = null;
+const MAX_START_ATTEMPTS = 2;
 let startAttempts = 0;
-const MAX_START_ATTEMPTS = 3;
 
 // ─── Process Management ──────────────────────────────────────────
 
@@ -36,28 +39,30 @@ async function downloadJar() {
 }
 
 async function ensureJar() {
-  if (existsSync(JAR_PATH)) return;
-  await downloadJar();
-}
-
-async function checkJava() {
-  try {
-    const { execFile } = await import('child_process');
-    const { promisify } = await import('util');
-    await promisify(execFile)('java', ['-version'], { timeout: 10000 });
-  } catch {
-    console.warn('[Lavalink] Java not found - Lavalink unavailable. YouTube audio will use fallback methods.');
-    cleanup();
-    throw new Error('Java not found');
-  }
+  if (!existsSync(JAR_PATH)) await downloadJar();
 }
 
 async function start() {
-  if (lavalinkProcess) return;
-  startAttempts++;
+  if (lavalinkProcess || failed) return;
 
+  // Create fresh promise for this attempt
+  let _resolve, _reject;
+  const promise = new Promise((resolve, reject) => { _resolve = resolve; _reject = reject; });
+  readyResolve = _resolve;
+  readyReject = _reject;
+
+  startAttempts++;
   try {
-    await checkJava();
+    // Check Java
+    try {
+      await execFileAsync('java', ['-version'], { timeout: 10000 });
+    } catch {
+      console.warn('[Lavalink] Java not found - Lavalink unavailable');
+      failed = true;
+      if (_reject) _reject(new Error('Java not found'));
+      return;
+    }
+
     if (!existsSync(PLUGINS_DIR)) mkdirSync(PLUGINS_DIR, { recursive: true });
     await ensureJar();
 
@@ -65,111 +70,118 @@ async function start() {
     lavalinkProcess = spawn('java', [
       '-jar', JAR_PATH,
       '--spring.config.location=' + join(LAVALINK_DIR, 'application.yml'),
-    ], {
-      cwd: LAVALINK_DIR,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    ], { cwd: LAVALINK_DIR, stdio: ['ignore', 'pipe', 'pipe'] });
 
     lavalinkProcess.stdout.on('data', (data) => {
-      const line = data.toString();
-      if (line.includes('Started Launcher') || line.includes('Lavalink is ready')) {
+      if (data.toString().includes('Started Launcher') || data.toString().includes('Lavalink is ready')) {
         ready = true;
-        if (readyResolve) { readyResolve(); readyResolve = null; }
+        if (readyResolve) { readyResolve(); readyResolve = null; readyReject = null; }
         console.log('[Lavalink] Ready!');
       }
     });
 
     lavalinkProcess.stderr.on('data', (data) => {
-      const line = data.toString();
-      if (line.includes('Started Launcher') || line.includes('Lavalink is ready')) {
+      if (data.toString().includes('Started Launcher') || data.toString().includes('Lavalink is ready')) {
         ready = true;
-        if (readyResolve) { readyResolve(); readyResolve = null; }
+        if (readyResolve) { readyResolve(); readyResolve = null; readyReject = null; }
         console.log('[Lavalink] Ready!');
       }
     });
 
     lavalinkProcess.on('error', (err) => {
       console.error('[Lavalink] Process error:', err.message);
-      cleanup();
+      if (readyReject) { readyReject(err); readyResolve = null; readyReject = null; }
     });
 
-    lavalinkProcess.on('exit', (code, signal) => {
-      console.warn('[Lavalink] Exited with code=' + code + ' signal=' + signal);
-      cleanup();
+    lavalinkProcess.on('exit', (code) => {
+      console.warn('[Lavalink] Exited with code', code);
+      ready = false;
+      lavalinkProcess = null;
       if (startAttempts < MAX_START_ATTEMPTS) {
-        console.log('[Lavalink] Restarting (attempt ' + (startAttempts + 1) + '/' + MAX_START_ATTEMPTS + ') ...');
         setTimeout(() => start(), 2000);
+      } else {
+        failed = true;
+        if (readyReject) { readyReject(new Error('Lavalink exited')); readyResolve = null; readyReject = null; }
       }
     });
 
     // Wait for ready (timeout 30s)
     await Promise.race([
-      readyPromise,
+      promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error('Lavalink startup timeout')), 30000)),
     ]);
 
     startAttempts = 0;
   } catch (err) {
-    console.error('[Lavalink] Failed to start:', err.message);
-    cleanup();
-    throw err;
+    console.error('[Lavalink] Failed:', err.message);
+    lavalinkProcess = null;
+    ready = false;
+    if (readyReject) { readyReject(err); readyResolve = null; readyReject = null; }
+    if (startAttempts >= MAX_START_ATTEMPTS) failed = true;
   }
-}
-
-function cleanup() {
-  ready = false;
-  readyPromise = new Promise((resolve) => { readyResolve = resolve; });
 }
 
 function stop() {
-  if (lavalinkProcess) {
-    lavalinkProcess.kill('SIGTERM');
-    lavalinkProcess = null;
-  }
+  if (lavalinkProcess) { lavalinkProcess.kill('SIGTERM'); lavalinkProcess = null; }
   ready = false;
+  if (readyReject) { readyReject(new Error('Lavalink stopped')); readyResolve = null; readyReject = null; }
 }
 
-function isReady() { return ready; }
-function waitForReady() { return readyPromise; }
+async function waitForReady() {
+  if (failed) throw new Error('Lavalink unavailable');
+  if (ready) return;
+  let _resolve, _reject;
+  const p = new Promise((resolve, reject) => { _resolve = resolve; _reject = reject; });
+  readyResolve = _resolve;
+  readyReject = _reject;
+  if (!lavalinkProcess && !failed) start().catch(() => {});
+  await p.catch(() => { throw new Error('Lavalink unavailable'); });
+}
 
 // ─── REST API ─────────────────────────────────────────────────────
 
-async function loadTrack(videoUrl) {
-  if (!ready) await waitForReady();
-  const res = await fetch(BASE + '/v4/loadtracks?identifier=' + encodeURIComponent(videoUrl), {
-    headers: HEADERS,
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) throw new Error('Lavalink loadtracks HTTP ' + res.status);
-  const data = await res.json();
-  if (!data.data || data.data.length === 0) throw new Error('No tracks loaded from Lavalink');
-  return data.data[0];
-}
-
-async function downloadTrack(videoId) {
-  if (!ready) await waitForReady();
-  // Try the youtube plugin download endpoint
-  const res = await fetch(BASE + '/youtube/download/' + videoId, {
-    headers: HEADERS,
-    signal: AbortSignal.timeout(30000),
-  });
-  if (res.ok && res.body) {
-    return Readable.fromWeb(res.body);
+async function tryGetStream(videoId) {
+  if (failed) throw new Error('Lavalink unavailable');
+  if (!ready) {
+    try {
+      await Promise.race([
+        waitForReady(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Lavalink wait timeout')), 15000)),
+      ]);
+    } catch {
+      throw new Error('Lavalink not ready');
+    }
   }
-  throw new Error('Lavalink download HTTP ' + res.status);
-}
 
-async function getAudioStream(videoId) {
+  const errs = [];
+
+  // Try download endpoint first
   try {
-    const track = await loadTrack('https://www.youtube.com/watch?v=' + videoId);
-    console.log('[Lavalink] Track loaded:', track.info?.title);
-    const stream = await downloadTrack(videoId);
-    console.log('[Lavalink] Download stream for', videoId);
-    return stream;
-  } catch (err) {
-    console.warn('[Lavalink] Failed for', videoId + ':', err.message);
-    throw err;
-  }
+    const res = await fetch(BASE + '/youtube/download/' + videoId, {
+      headers: HEADERS, signal: AbortSignal.timeout(20000),
+    });
+    if (res.ok && res.body) {
+      console.log('[Lavalink] Downloaded', videoId);
+      return Readable.fromWeb(res.body);
+    }
+    errs.push('download HTTP ' + res.status);
+  } catch (e) { errs.push(e.message); }
+
+  // Fallback: load track and try identifier-based stream
+  try {
+    const res = await fetch(BASE + '/v4/loadtracks?identifier=' + encodeURIComponent('https://www.youtube.com/watch?v=' + videoId), {
+      headers: HEADERS, signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data?.[0]) {
+        console.log('[Lavalink] Track loaded:', data.data[0].info?.title || videoId);
+      }
+    }
+    errs.push('loadtracks ' + res.status);
+  } catch (e) { errs.push(e.message); }
+
+  throw new Error(errs.join(' | '));
 }
 
-export { start, stop, isReady, waitForReady, loadTrack, downloadTrack, getAudioStream };
+export { start, stop, waitForReady, tryGetStream };

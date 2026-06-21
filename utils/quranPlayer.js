@@ -4,7 +4,24 @@ import { loadConfig } from './configLoader.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { Readable } from 'stream';
 import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { platform } from 'os';
+import { createRequire } from 'module';
 import { gold as embedGold } from './embedStyles.js';
+
+// ─── yt-dlp-wrap setup ───────────────────────────────────────────
+const _require = createRequire(import.meta.url);
+const YtDlpWrap = _require('yt-dlp-wrap').default;
+const _ytdlpBin = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..', 'node_modules', '@distube', 'yt-dlp', 'bin',
+  platform() === 'win32' ? 'yt-dlp.exe' : 'yt-dlp',
+);
+const _ytDlp = existsSync(_ytdlpBin) ? new YtDlpWrap(_ytdlpBin) : null;
+const _cookiesPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'cookies.txt');
+const _hasCookies = existsSync(_cookiesPath);
+if (_ytDlp) console.log('[QuranPlayer] yt-dlp binary found:', _ytdlpBin);
+else console.warn('[QuranPlayer] yt-dlp binary not found, will use Invidious only');
 
 const SURAHS = [
   { id: 1, name: 'الفاتحة', ayahCount: 7 },
@@ -246,16 +263,44 @@ let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 5;
 
 // ─── Invidious API (YouTube proxy) ───────────────────────────────
-// Strategy: YouTube playlist scrape → Invidious video API → googlevideo.com direct URL
-// Tested: googlevideo.com URLs work from any hosting server (206 OK)
-const INVIDIOUS_INSTANCES = [
-  'https://inv.thepixora.com',
+// Strategy: YouTube playlist scrape → Invidious video API (local=true) → proxied stream
+// IMPORTANT: ?local=true makes Invidious proxy the stream through itself,
+// avoiding googlevideo.com 403 blocks on hosting servers.
+
+// Fallback hardcoded instances (updated dynamically at startup)
+let invidiousInstances = [
   'https://inv.nadeko.net',
   'https://invidious.nerdvpn.de',
-  'https://invidious.f5.si',
   'https://yt.chocolatemoo53.com',
   'https://invidious.tiekoetter.com',
+  'https://invidious.f5.si',
+  'https://inv.thepixora.com',
 ];
+
+// Dynamically fetch and test Invidious instances from the official registry
+let instancesRefreshedAt = 0;
+async function refreshInvidiousInstances() {
+  // Only refresh once every 6 hours
+  if (Date.now() - instancesRefreshedAt < 6 * 3600 * 1000) return;
+  try {
+    const res = await fetch('https://api.invidious.io/instances.json', {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const candidates = data
+      .map(item => item[1])
+      .filter(inst => inst.type === 'https' && inst.uri && inst.monitor && !inst.monitor.down)
+      .map(inst => inst.uri);
+    if (candidates.length > 0) {
+      invidiousInstances = candidates;
+      instancesRefreshedAt = Date.now();
+      console.log('[QuranPlayer] Refreshed Invidious instances:', candidates.length, 'found');
+    }
+  } catch (err) {
+    console.warn('[QuranPlayer] Failed to refresh Invidious instances:', err.message);
+  }
+}
 
 // Cache: videoId → { url, expires }
 const streamUrlCache = new Map();
@@ -263,16 +308,23 @@ const streamUrlCache = new Map();
 const playlistCache = new Map();
 
 async function invidiousFetch(path, timeout = 12000) {
-  for (const base of INVIDIOUS_INSTANCES) {
+  await refreshInvidiousInstances();
+  const errors = [];
+  for (const base of invidiousInstances) {
     try {
       const res = await fetch(base + path, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: AbortSignal.timeout(timeout),
       });
-      if (res.ok) return await res.json();
-    } catch { /* try next instance */ }
+      if (res.ok) {
+        const json = await res.json();
+        return { data: json, instanceUrl: base };
+      }
+    } catch (e) {
+      errors.push(`${base}: ${e.message || e}`);
+    }
   }
-  throw new Error('All Invidious instances failed for: ' + path);
+  throw new Error('All Invidious instances failed for: ' + path + ' — ' + errors.join('; '));
 }
 
 // Fetch video IDs from a YouTube playlist by scraping the YouTube page
@@ -302,20 +354,81 @@ async function fetchPlaylistVideoIds(playlistId) {
   return result;
 }
 
-// Get a direct streamable audio URL for a YouTube video ID via Invidious
-async function getAudioUrlFromInvidious(videoId) {
-  // Check cache (googlevideo URLs expire after ~6h, we cache for 5h)
+// Get a streamable audio URL for a YouTube video ID
+// Strategy: 1) yt-dlp (with cookies if available), 2) Invidious proxy, 3) yt-dlp fallback search
+async function getAudioUrlFromInvidious(videoId, fallbackSearchTerm = null) {
+  // Check cache
   const cached = streamUrlCache.get(videoId);
   if (cached && Date.now() < cached.expires) return cached.url;
 
-  const data = await invidiousFetch('/api/v1/videos/' + videoId);
-  const audios = (data.adaptiveFormats || []).filter(f => f.type?.startsWith('audio'));
-  audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-  if (!audios[0]?.url) throw new Error('No audio streams for videoId ' + videoId);
+  let lastError = null;
 
-  const url = audios[0].url;
-  streamUrlCache.set(videoId, { url, expires: Date.now() + 5 * 3600 * 1000 });
-  return url;
+  // ── Strategy 1: yt-dlp ─────────────────────────────────────────
+  if (_ytDlp) {
+    try {
+      const args = [
+        `https://www.youtube.com/watch?v=${videoId}`,
+        '--format', 'bestaudio[ext=webm]/bestaudio/best',
+        '--no-playlist',
+        '--js-runtimes', 'node',
+      ];
+      if (_hasCookies) args.push('--cookies', _cookiesPath);
+
+      const info = await _ytDlp.getVideoInfo(args);
+      if (info?.url) {
+        // Cache for 5 hours (googlevideo URLs expire in ~6h)
+        streamUrlCache.set(videoId, { url: info.url, expires: Date.now() + 5 * 3600 * 1000 });
+        console.log('[QuranPlayer] yt-dlp resolved audio URL for', videoId);
+        return info.url;
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn('[QuranPlayer] yt-dlp failed for', videoId + ':', err.message?.split('\n').pop());
+    }
+  }
+
+  // ── Strategy 2: Invidious (local=true proxy) ───────────────────
+  try {
+    const { data, instanceUrl } = await invidiousFetch('/api/v1/videos/' + videoId + '?local=true');
+    const audios = (data.adaptiveFormats || []).filter(f => f.type?.startsWith('audio'));
+    audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+    if (audios[0]?.url) {
+      let url = audios[0].url;
+      if (url.startsWith('/')) url = instanceUrl + url;
+      streamUrlCache.set(videoId, { url, expires: Date.now() + 4 * 3600 * 1000 });
+      console.log('[QuranPlayer] Invidious resolved audio URL via', instanceUrl, 'for', videoId);
+      return url;
+    }
+  } catch (err) {
+    lastError = err;
+    console.warn('[QuranPlayer] Invidious failed for', videoId + ':', err.message);
+  }
+
+  // ── Strategy 3: yt-dlp Fallback Search ──────────────────────────
+  if (fallbackSearchTerm && _ytDlp) {
+    console.log('[QuranPlayer] Attempting fallback search for:', fallbackSearchTerm);
+    try {
+      const args = [
+        `ytsearch1:${fallbackSearchTerm}`,
+        '--format', 'bestaudio[ext=webm]/bestaudio/best',
+        '--no-playlist',
+        '--js-runtimes', 'node',
+      ];
+      if (_hasCookies) args.push('--cookies', _cookiesPath);
+
+      const info = await _ytDlp.getVideoInfo(args);
+      if (info?.url) {
+        // Cache the fallback URL for this videoId so we don't search again for 12 hours
+        streamUrlCache.set(videoId, { url: info.url, expires: Date.now() + 12 * 3600 * 1000 });
+        console.log('[QuranPlayer] Fallback search succeeded for', fallbackSearchTerm, '-> ID:', info.id);
+        return info.url;
+      }
+    } catch (err) {
+      console.error('[QuranPlayer] Fallback search failed:', err.message?.split('\n').pop());
+    }
+  }
+
+  throw lastError || new Error('Failed to resolve audio URL for videoId ' + videoId);
 }
 
 function extractVideoId(url) {
@@ -746,9 +859,9 @@ class QuranPlayer {
         const vid = this.playlistVideos[surahId - 1];
         if (!vid) { console.warn('[QuranPlayer] No video for surah', surahId); return; }
         try {
-          url = await getAudioUrlFromInvidious(vid.id);
+          url = await getAudioUrlFromInvidious(vid.id, `${reciter.name} سورة ${surah.name}`);
         } catch (err) {
-          console.warn('[QuranPlayer] Invidious failed for', vid.id + ':', err.message);
+          console.warn('[QuranPlayer] Invidious/yt-dlp failed for', vid.id + ':', err.message);
           consecutiveErrors++;
           if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
             console.warn('[QuranPlayer] Too many errors, stopping.');
@@ -771,9 +884,9 @@ class QuranPlayer {
       const videoId = extractVideoId(reciterCfg.url);
       if (videoId) {
         try {
-          url = await getAudioUrlFromInvidious(videoId);
+          url = await getAudioUrlFromInvidious(videoId, `${item.name} ${reciterCfg.name}`);
         } catch (err) {
-          console.warn('[QuranPlayer] Invidious failed for custom audio:', err.message);
+          console.warn('[QuranPlayer] Invidious/yt-dlp failed for custom audio:', err.message);
           return;
         }
       } else {
@@ -802,7 +915,7 @@ class QuranPlayer {
         const vid = this.playlistVideos[randomSurah.id - 1];
         if (!vid) return;
         try {
-          url = await getAudioUrlFromInvidious(vid.id);
+          url = await getAudioUrlFromInvidious(vid.id, `${reciter.name} سورة ${randomSurah.name}`);
         } catch (err) {
           console.warn('[QuranPlayer] Invidious random failed:', err.message);
           setTimeout(() => this.playRandom(), 3000);
@@ -828,7 +941,7 @@ class QuranPlayer {
       const videoId = extractVideoId(url);
       if (videoId) {
         try {
-          url = await getAudioUrlFromInvidious(videoId);
+          url = await getAudioUrlFromInvidious(videoId, `${randomItem.name} ${rc.name}`);
         } catch (err) {
           console.warn('[QuranPlayer] Invidious random failed for custom audio:', err.message);
           return;

@@ -306,6 +306,8 @@ async function refreshInvidiousInstances() {
 const streamUrlCache = new Map();
 // Cache: playlistId → { ids, expires }
 const playlistCache = new Map();
+// Track videoIds that gave 403 from Invidious — skip to Piped next time
+const invidiousBlockedIds = new Set();
 
 async function invidiousFetch(path, timeout = 12000) {
   await refreshInvidiousInstances();
@@ -409,20 +411,23 @@ async function getAudioUrlFromInvidious(videoId, fallbackSearchTerm = null) {
   }
 
   // ── Strategy 2: Invidious (local=true proxy) ───────────────────
-  try {
-    const { data, instanceUrl } = await invidiousFetch('/api/v1/videos/' + videoId + '?local=true');
-    const audios = (data.adaptiveFormats || []).filter(f => f.type?.startsWith('audio'));
-    audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-    if (audios[0]?.url) {
-      let url = audios[0].url;
-      if (url.startsWith('/')) url = instanceUrl + url;
-      streamUrlCache.set(videoId, { url, expires: Date.now() + 4 * 3600 * 1000 });
-      console.log('[QuranPlayer] Invidious proxy resolved for', videoId, 'via', instanceUrl);
-      return url;
+  // Skip if this videoId previously gave 403 — go straight to Piped
+  if (!invidiousBlockedIds.has(videoId)) {
+    try {
+      const { data, instanceUrl } = await invidiousFetch('/api/v1/videos/' + videoId + '?local=true');
+      const audios = (data.adaptiveFormats || []).filter(f => f.type?.startsWith('audio'));
+      audios.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+      if (audios[0]?.url) {
+        let url = audios[0].url;
+        if (url.startsWith('/')) url = instanceUrl + url;
+        streamUrlCache.set(videoId, { url, expires: Date.now() + 2 * 3600 * 1000 });
+        console.log('[QuranPlayer] Invidious proxy resolved for', videoId, 'via', instanceUrl);
+        return url;
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn('[QuranPlayer] Invidious proxy failed for', videoId + ':', err.message);
     }
-  } catch (err) {
-    lastError = err;
-    console.warn('[QuranPlayer] Invidious proxy failed for', videoId + ':', err.message);
   }
 
   // ── Strategy 3: Piped API direct ───────────────────────────────
@@ -845,9 +850,11 @@ class QuranPlayer {
     } catch (err) {
       consecutiveErrors++;
       const msg = err.message || '';
-      // Clear cache on 403 so next retry fetches a fresh URL from a different source
+      // On 403: clear cache and mark videoId so Invidious is skipped next time
       if (msg.includes('403') && videoId) {
         streamUrlCache.delete(videoId);
+        invidiousBlockedIds.add(videoId);
+        console.warn('[QuranPlayer] 403 blocked, will skip Invidious for', videoId, 'next time');
       }
       console.warn('[QuranPlayer] Failed to play', url + ':' + msg, `(consecutive: ${consecutiveErrors})`);
       if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {

@@ -830,7 +830,7 @@ class QuranPlayer {
     return item ? item.id : null;
   }
 
-  async playUrl(url) {
+  async playUrl(url, videoId) {
     try {
       const stream = await streamUrl(url);
       consecutiveErrors = 0;
@@ -844,7 +844,12 @@ class QuranPlayer {
       savePlayerState(this);
     } catch (err) {
       consecutiveErrors++;
-      console.warn('[QuranPlayer] Failed to play', url + ':' + err.message, `(consecutive: ${consecutiveErrors})`);
+      const msg = err.message || '';
+      // Clear cache on 403 so next retry fetches a fresh URL from a different source
+      if (msg.includes('403') && videoId) {
+        streamUrlCache.delete(videoId);
+      }
+      console.warn('[QuranPlayer] Failed to play', url + ':' + msg, `(consecutive: ${consecutiveErrors})`);
       if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
         console.warn('[QuranPlayer] Too many consecutive errors, clearing queue');
         this.queue = [];
@@ -873,7 +878,7 @@ class QuranPlayer {
       }
     }
 
-    let url;
+    let url, currentVidId;
     if (this.contentType === 'quran') {
       const surahId = this.queue[this.queueIndex];
       const reciter = getReciters()[this.reciterId];
@@ -883,17 +888,17 @@ class QuranPlayer {
       this.currentSurah = surah;
       this.currentItem = null;
       if (reciter.youtubePlaylistId) {
-        // Fetch playlist if not loaded yet
         if (this.playlistVideos.length === 0) {
           const ok = await this.fetchPlaylist(reciter.youtubePlaylistId);
           if (!ok) return;
         }
         const vid = this.playlistVideos[surahId - 1];
         if (!vid) { console.warn('[QuranPlayer] No video for surah', surahId); return; }
+        currentVidId = vid.id;
         try {
-          url = await getAudioUrlFromInvidious(vid.id, `${reciter.name} سورة ${surah.name}`);
+          url = await getAudioUrlFromInvidious(currentVidId, `${reciter.name} سورة ${surah.name}`);
         } catch (err) {
-          console.warn('[QuranPlayer] Invidious/yt-dlp failed for', vid.id + ':', err.message);
+          console.warn('[QuranPlayer] Invidious/yt-dlp failed for', currentVidId + ':', err.message);
           consecutiveErrors++;
           if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
             console.warn('[QuranPlayer] Too many errors, stopping.');
@@ -913,20 +918,23 @@ class QuranPlayer {
       if (!reciterCfg) return;
       this.currentSurah = null;
 
-      const videoId = extractVideoId(reciterCfg.url);
-      if (videoId) {
+      const extractedId = extractVideoId(reciterCfg.url);
+      if (extractedId) {
         try {
-          url = await getAudioUrlFromInvidious(videoId, `${item.name} ${reciterCfg.name}`);
+          url = await getAudioUrlFromInvidious(extractedId, `${item.name} ${reciterCfg.name}`);
         } catch (err) {
           console.warn('[QuranPlayer] Invidious/yt-dlp failed for custom audio:', err.message);
           return;
         }
+        await this.playUrl(url, extractedId);
       } else {
         url = reciterCfg.url;
+        await this.playUrl(url);
       }
+      return;
     }
 
-    await this.playUrl(url);
+    await this.playUrl(url, currentVidId);
   }
 
   async playRandom() {
@@ -956,7 +964,7 @@ class QuranPlayer {
       } else {
         url = reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3';
       }
-      this.playUrl(url);
+      this.playUrl(url, this.contentType === 'quran' && reciter.youtubePlaylistId ? this.playlistVideos[randomSurah.id - 1]?.id : null);
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       if (items.length === 0) return;
@@ -970,16 +978,16 @@ class QuranPlayer {
       this.queueIndex = 0;
 
       let url = rc.url;
-      const videoId = extractVideoId(url);
-      if (videoId) {
+      const vidId = extractVideoId(url);
+      if (vidId) {
         try {
-          url = await getAudioUrlFromInvidious(videoId, `${randomItem.name} ${rc.name}`);
+          url = await getAudioUrlFromInvidious(vidId, `${randomItem.name} ${rc.name}`);
         } catch (err) {
           console.warn('[QuranPlayer] Invidious random failed for custom audio:', err.message);
           return;
         }
       }
-      this.playUrl(url);
+      this.playUrl(url, vidId);
     }
   }
 

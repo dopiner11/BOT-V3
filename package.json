@@ -22,6 +22,7 @@
     "install": "^0.13.0",
     "libsodium-wrappers": "^0.8.4",
     "node-cron": "^4.2.1",
+    "node-json-db": "^2.6.0",
     "npm": "^11.8.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

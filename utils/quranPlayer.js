@@ -147,11 +147,6 @@ function getReciters() {
   return defaults;
 }
 
-function getCookiesPath() {
-  const config = loadConfig();
-  return config.quran?.cookiesPath || null;
-}
-
 const ITEMS_PER_PAGE = 25;
 
 function getCustomAudioData() {
@@ -525,7 +520,7 @@ class QuranPlayer {
       let stream;
       const videoId = extractVideoId(url);
       if (videoId) {
-        const streamInfo = await ytGetStream(videoId, getCookiesPath());
+        const streamInfo = await ytGetStream(videoId);
         const res = await fetch(streamInfo.url, {
           headers: streamInfo.httpHeaders || {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -589,7 +584,7 @@ class QuranPlayer {
         await this.playUrl(url);
       } else {
         const q = `${reciter.name} سورة ${surah.name} كاملة`;
-        const r = await ytSearch(q, getCookiesPath());
+        const r = await ytSearch(q);
         await this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
       }
     } else {
@@ -603,7 +598,7 @@ class QuranPlayer {
         await this.playUrl(reciterCfg.url);
       } else {
         const q = `${reciterCfg.name} ${item.name}`;
-        const r = await ytSearch(q, getCookiesPath());
+        const r = await ytSearch(q);
         await this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
       }
     }
@@ -622,7 +617,7 @@ class QuranPlayer {
         this.playUrl(reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3');
       } else {
         const q = `${reciter.name} سورة ${randomSurah.name} كاملة`;
-        const r = await ytSearch(q, getCookiesPath());
+        const r = await ytSearch(q);
         this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
       }
     } else {
@@ -640,7 +635,7 @@ class QuranPlayer {
         this.playUrl(rc.url);
       } else {
         const q = `${rc.name} ${randomItem.name}`;
-        const r = await ytSearch(q, getCookiesPath());
+        const r = await ytSearch(q);
         this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
       }
     }

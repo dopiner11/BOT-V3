@@ -920,7 +920,6 @@
     ]
   },
   "quran": {
-    "cookiesPath": "./MusicBot-main/cookies.txt",
     "reciters": [
       {
         "id": "basit",

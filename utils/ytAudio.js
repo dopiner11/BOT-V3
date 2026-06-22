@@ -1,5 +1,6 @@
 import { createRequire } from 'module';
 import { resolve, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,8 +19,23 @@ try {
   process.chdir(origCwd);
 }
 
+const CACHE_DIR = resolve(__dirname, '../.cache');
+const SEARCH_CACHE_FILE = resolve(CACHE_DIR, 'ytSearch.json');
 const streamCache = new Map();
-const searchCache = new Map();
+
+function loadCache() {
+  try {
+    if (existsSync(SEARCH_CACHE_FILE)) return JSON.parse(readFileSync(SEARCH_CACHE_FILE, 'utf8'));
+  } catch {}
+  return {};
+}
+
+function saveCache(cache) {
+  try {
+    if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(SEARCH_CACHE_FILE, JSON.stringify(cache, null, 2));
+  } catch {}
+}
 
 function timeout(promise, ms) {
   return Promise.race([
@@ -29,15 +45,16 @@ function timeout(promise, ms) {
 }
 
 export async function search(query) {
-  const cached = searchCache.get(query);
-  if (cached) return cached;
+  const cache = loadCache();
+  if (cache[query]) return cache[query];
 
-  const results = await timeout(YouTube.search(query, 1), 30000);
+  const results = await timeout(YouTube.search(query, 1), 60000);
   if (!results?.length) throw new Error(`No YouTube results for: ${query}`);
 
   const track = results[0];
   const info = { videoId: track.id, title: track.title, duration: track.duration || 0 };
-  searchCache.set(query, info);
+  cache[query] = info;
+  saveCache(cache);
   return info;
 }
 
@@ -58,7 +75,7 @@ export async function getStream(videoId) {
       });
       opts.retries = 1;
       opts.fragmentRetries = 1;
-      const result = await timeout(ytdl(url, opts, { timeout: 30000 }), 35000);
+      const result = await timeout(ytdl(url, opts, { timeout: 60000 }), 65000);
       if (result?.url) {
         const info = {
           url: result.url,

@@ -7,8 +7,9 @@ const TIMEOUT = 30000;
 const BASE = {
   noCheckCertificates: true,
   noWarnings: true,
-  retries: 1,
-  fragmentRetries: 1,
+  retries: 3,
+  fragmentRetries: 3,
+  jsRuntimes: `node:${process.execPath}`,
   addHeader: [
     'referer:youtube.com',
     'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -41,10 +42,7 @@ export async function search(query, cookiesPath) {
     result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true, cookies: cookiesPath }));
   }
   if (!result) {
-    result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true }));
-  }
-  if (!result) {
-    result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true, extractorArgs: 'youtube:player_client=android' }));
+    result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true, extractorArgs: 'youtube:player_client=ios' }));
   }
 
   if (!result?.entries?.[0]) throw new Error(`No YouTube results for: ${query}`);
@@ -64,12 +62,6 @@ export async function getStream(videoId, cookiesPath) {
 
   if (cookiesPath && existsSync(cookiesPath)) {
     result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best', cookies: cookiesPath }));
-  }
-  if (!result) {
-    result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best' }));
-  }
-  if (!result) {
-    result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best', extractorArgs: 'youtube:player_client=android' }));
   }
   if (!result) {
     result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best', extractorArgs: 'youtube:player_client=ios' }));

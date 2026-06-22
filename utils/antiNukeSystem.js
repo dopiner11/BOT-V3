@@ -28,6 +28,7 @@ function getAntiNukeConfig() {
 
 const actionCache = new Map();
 const CACHE_CLEAN_INTERVAL = 60000;
+const punishingUsers = new Set();
 
 setInterval(() => {
   const now = Date.now();
@@ -148,13 +149,19 @@ async function removeAdminRoles(member, reason) {
   const botMember = member.guild.members.cache.get(member.guild.client.user.id);
   if (!botMember) return [];
   const removed = [];
+  const rolesToKeep = [];
+
   for (const role of member.roles.cache.values()) {
     if (role.id === member.guild.id) continue;
     if (role.permissions.any(ADMIN_PERMISSIONS) && role.comparePositionTo(botMember.roles.highest) < 0) {
-      await member.roles.remove(role.id, reason).catch(() => {});
       removed.push(role.id);
-      await new Promise(r => setTimeout(r, 350));
+    } else {
+      rolesToKeep.push(role.id);
     }
+  }
+
+  if (removed.length > 0) {
+    await member.roles.set(rolesToKeep, reason).catch(() => {});
   }
   return removed;
 }
@@ -190,16 +197,24 @@ async function punishMember(member, guild, reason) {
     if (!botMember) return false;
     const canManage = member.roles.highest.comparePositionTo(botMember.roles.highest) < 0;
     if (!canManage) return false;
-    const memberRoles = member.roles.cache.filter(r => r.id !== guild.id && r.comparePositionTo(botMember.roles.highest) < 0);
-    const roleIds = memberRoles.map(r => r.id);
-    const targetRoles = roleIds.filter(id => {
-      const bypassRoles = getAntiNukeConfig().bypassRoleIds || [];
-      return !bypassRoles.includes(id);
-    });
-    for (const roleId of targetRoles) {
-      await member.roles.remove(roleId, reason).catch(() => {});
-      await new Promise(r => setTimeout(r, 350));
+
+    const bypassRoles = getAntiNukeConfig().bypassRoleIds || [];
+    const rolesToKeep = [];
+    const targetRoles = [];
+
+    for (const role of member.roles.cache.values()) {
+      if (role.id === guild.id) continue;
+      if (role.comparePositionTo(botMember.roles.highest) < 0 && !bypassRoles.includes(role.id)) {
+        targetRoles.push(role.id);
+      } else {
+        rolesToKeep.push(role.id);
+      }
     }
+
+    if (targetRoles.length > 0) {
+      await member.roles.set(rolesToKeep, reason).catch(() => {});
+    }
+
     await new Promise(r => setTimeout(r, 500));
     await member.timeout(3600000, reason).catch(() => {});
     await logPunishment(guild, member, reason, targetRoles.length, false);
@@ -248,6 +263,31 @@ async function logPunishment(guild, member, reason, rolesRemoved, isBan) {
   } catch {}
 }
 
+async function checkAndPunish(member, guild, actionType, threshold, reasonBase, windowMs = 60000) {
+  if (punishingUsers.has(member.id)) return;
+
+  const count = recordAction(member.id, actionType, windowMs);
+  if (count >= threshold) {
+    punishingUsers.add(member.id);
+    resetUserCache(member.id);
+
+    try {
+      if (await hasAdminRoles(member)) {
+        await punishRemoveAdminRoles(member, guild, `${reasonBase} (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
+      } else {
+        const durationStr = windowMs === 10000 ? '10 ثواني' : (windowMs === 3000 ? '3 ثواني' : 'دقيقة');
+        await punishMember(member, guild, `${reasonBase} (${count} مرة خلال ${durationStr}) - Anti Nuke`);
+      }
+    } catch (e) {
+      console.error('Error in checkAndPunish:', e);
+    }
+
+    setTimeout(() => {
+      punishingUsers.delete(member.id);
+    }, 5000);
+  }
+}
+
 export async function handleGuildRoleUpdate(oldRole, newRole) {
   const guild = newRole.guild;
   const changedName = oldRole.name !== newRole.name;
@@ -258,16 +298,9 @@ export async function handleGuildRoleUpdate(oldRole, newRole) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'role_edit', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleEditThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `تعديل رتب متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `تعديل رتب متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'role_edit', threshold, 'تعديل رتب متكرر');
 }
 
 export async function handleGuildRoleDelete(role) {
@@ -277,16 +310,9 @@ export async function handleGuildRoleDelete(role) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'role_delete', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleDeleteThreshold || 2;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `حذف رتب متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `حذف رتب متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'role_delete', threshold, 'حذف رتب متكرر');
 }
 
 export async function handleGuildRoleCreate(role) {
@@ -296,16 +322,9 @@ export async function handleGuildRoleCreate(role) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'role_create', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleCreateThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `إنشاء رتب متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `إنشاء رتب متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'role_create', threshold, 'إنشاء رتب متكرر');
 }
 
 export async function handleChannelDelete(channel) {
@@ -315,16 +334,9 @@ export async function handleChannelDelete(channel) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'channel_delete', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelDeleteThreshold || 2;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `حذف رومات متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `حذف رومات متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'channel_delete', threshold, 'حذف رومات متكرر');
 }
 
 export async function handleChannelCreate(channel) {
@@ -334,16 +346,9 @@ export async function handleChannelCreate(channel) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'channel_create', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelCreateThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `إنشاء رومات متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `إنشاء رومات متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'channel_create', threshold, 'إنشاء رومات متكرر');
 }
 
 export async function handleChannelUpdate(oldChannel, newChannel) {
@@ -353,16 +358,9 @@ export async function handleChannelUpdate(oldChannel, newChannel) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'channel_update', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelUpdateThreshold || 5;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `تعديل صلاحيات رومات متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `تعديل صلاحيات رومات متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'channel_update', threshold, 'تعديل صلاحيات رومات متكرر');
 }
 
 export async function handleGuildBanAdd(ban) {
@@ -372,16 +370,9 @@ export async function handleGuildBanAdd(ban) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'ban', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.banThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `باند متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `باند متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'ban', threshold, 'باند متكرر');
 }
 
 export async function handleGuildMemberKick(member) {
@@ -391,16 +382,9 @@ export async function handleGuildMemberKick(member) {
   const config = loadConfig();
   const modMember = guild.members.cache.get(executor.id);
   if (!modMember || isExempt(modMember, config)) return;
-  const count = recordAction(executor.id, 'kick', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.kickThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(modMember)) {
-      await punishRemoveAdminRoles(modMember, guild, `كيك متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(modMember, guild, `كيك متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(modMember, guild, 'kick', threshold, 'كيك متكرر');
 }
 
 export async function handleGuildMemberTimeout(member, executorId) {
@@ -409,16 +393,9 @@ export async function handleGuildMemberTimeout(member, executorId) {
   const config = loadConfig();
   const modMember = guild.members.cache.get(executorId);
   if (!modMember || isExempt(modMember, config)) return;
-  const count = recordAction(executorId, 'timeout', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.timeoutThreshold || 5;
-  if (count >= threshold) {
-    if (await hasAdminRoles(modMember)) {
-      await punishRemoveAdminRoles(modMember, guild, `تايم آوت متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(modMember, guild, `تايم آوت متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(modMember, guild, 'timeout', threshold, 'تايم آوت متكرر');
 }
 
 export async function handleWebhookCreate(webhook) {
@@ -428,16 +405,9 @@ export async function handleWebhookCreate(webhook) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'webhook_create', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.webhookThreshold || 2;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `إنشاء ويب هوك متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `إنشاء ويب هوك متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'webhook_create', threshold, 'إنشاء ويب هوك متكرر');
 }
 
 export async function handleGuildMemberAdd(member) {
@@ -449,8 +419,15 @@ export async function handleGuildMemberAdd(member) {
   const modMember = guild.members.cache.get(executor.id);
   if (!modMember) return;
   if (isExempt(modMember, config)) return;
+  if (punishingUsers.has(modMember.id)) return;
+  
+  punishingUsers.add(modMember.id);
   await instantBan(modMember, guild, 'إضافة بوت - Anti Nuke');
   await instantBan(member, guild, 'دخول بوت غير مصرح به - Anti Nuke');
+  
+  setTimeout(() => {
+    punishingUsers.delete(modMember.id);
+  }, 5000);
 }
 
 export async function handleGuildUpdate(oldGuild, newGuild) {
@@ -463,16 +440,9 @@ export async function handleGuildUpdate(oldGuild, newGuild) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'guild_update', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.guildUpdateThreshold || 2;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `تغيير إعدادات السيرفر متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `تغيير إعدادات السيرفر متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'guild_update', threshold, 'تغيير إعدادات السيرفر متكرر');
 }
 
 export async function handleGuildEmojiCreate(emoji) {
@@ -482,16 +452,9 @@ export async function handleGuildEmojiCreate(emoji) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'emoji_create', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiCreateThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `إنشاء إيموجي متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `إنشاء إيموجي متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'emoji_create', threshold, 'إنشاء إيموجي متكرر');
 }
 
 export async function handleGuildEmojiUpdate(oldEmoji, newEmoji) {
@@ -503,16 +466,9 @@ export async function handleGuildEmojiUpdate(oldEmoji, newEmoji) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(executor.id, 'emoji_update', 60000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiUpdateThreshold || 3;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `تغيير إيموجي متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `تغيير إيموجي متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'emoji_update', threshold, 'تغيير إيموجي متكرر');
 }
 
 export async function handleMessageDelete(message) {
@@ -522,16 +478,9 @@ export async function handleMessageDelete(message) {
   const config = loadConfig();
   const member = guild.members.cache.get(message.author.id);
   if (!member || isExempt(member, config)) return;
-  const count = recordAction(message.author.id, 'message_delete', 10000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.messageDeleteThreshold || 10;
-  if (count >= threshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, guild, `حذف رسائل متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, guild, `حذف رسائل متكرر (${count} رسالة خلال 10 ثواني) - Anti Nuke`);
-    }
-  }
+  await checkAndPunish(member, guild, 'message_delete', threshold, 'حذف رسائل متكرر', 10000);
 }
 
 export async function handleMessageDeleteBulk(messages) {
@@ -543,16 +492,9 @@ export async function handleMessageDeleteBulk(messages) {
     const config = loadConfig();
     const member = guild.members.cache.get(deletedBy.id);
     if (member && !isExempt(member, config)) {
-      const count = recordAction(deletedBy.id, 'bulk_delete', 60000);
       const antiNuke = getAntiNukeConfig();
       const threshold = antiNuke.bulkDeleteThreshold || 2;
-      if (count >= threshold) {
-        if (await hasAdminRoles(member)) {
-          await punishRemoveAdminRoles(member, guild, `حذف جماعي للرسائل متكرر (${count} مرة) - سحب صلاحيات إدارية - Anti Nuke`);
-        } else {
-          await punishMember(member, guild, `حذف جماعي للرسائل متكرر (${count} مرة) - Anti Nuke`);
-        }
-      }
+      await checkAndPunish(member, guild, 'bulk_delete', threshold, 'حذف جماعي للرسائل متكرر');
     }
   }
 }
@@ -570,15 +512,9 @@ export async function handleMassMention(message) {
   const member = message.guild.members.cache.get(message.author.id);
   if (!member || isExempt(member, config)) return;
   await message.delete().catch(() => {});
-  const count = recordAction(message.author.id, 'mass_mention', 60000);
-  const repeatThreshold = antiNuke.mentionRepeatThreshold || 2;
-  if (count >= repeatThreshold) {
-    if (await hasAdminRoles(member)) {
-      await punishRemoveAdminRoles(member, message.guild, `منشن جماعي متكرر (${count} مرة خلال دقيقة) - سحب صلاحيات إدارية - Anti Nuke`);
-    } else {
-      await punishMember(member, message.guild, `منشن جماعي متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
-    }
-  }
+  const antiNukeConfig = getAntiNukeConfig();
+  const repeatThreshold = antiNukeConfig.mentionRepeatThreshold || 2;
+  await checkAndPunish(member, message.guild, 'mass_mention', repeatThreshold, 'منشن جماعي متكرر');
 }
 
 export async function handleSpam(message) {
@@ -586,12 +522,19 @@ export async function handleSpam(message) {
   const config = loadConfig();
   const member = message.guild.members.cache.get(message.author.id);
   if (!member || isExempt(member, config)) return;
+  if (punishingUsers.has(member.id)) return;
+  
   const count = recordAction(message.author.id, 'spam', 3000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.spamThreshold || 5;
   if (count >= threshold) {
+    punishingUsers.add(member.id);
+    resetUserCache(member.id);
     await message.delete().catch(() => {});
     await timeoutOnly(member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 600000);
+    setTimeout(() => {
+      punishingUsers.delete(member.id);
+    }, 5000);
   }
 }
 

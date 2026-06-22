@@ -7,14 +7,15 @@ const require = createRequire(import.meta.url);
 const origCwd = process.cwd();
 
 let YouTube;
+let ytdl;
 try {
   process.chdir(resolve(__dirname, '../MusicBot-main'));
 
-  // Use cookies.txt instead of cookiesFromBrowser (Chrome not available on server)
   process.env.COOKIES_FROM_BROWSER = '';
   process.env.COOKIES_FILE = resolve(__dirname, '../MusicBot-main/cookies.txt');
 
   YouTube = require(resolve(__dirname, '../MusicBot-main/src/YouTube.js'));
+  ytdl = require('youtube-dl-exec');
 } finally {
   process.chdir(origCwd);
 }
@@ -40,17 +41,29 @@ export async function getStream(videoId) {
   if (cached) return cached;
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const result = await YouTube.getStream(url);
+  const formats = ['bestaudio*', 'bestaudio/best', 'worstaudio', 'best'];
 
-  const info = {
-    url: result.url,
-    type: result.type,
-    duration: result.duration || 0,
-    bitrate: result.bitrate || 0,
-    httpHeaders: result.httpHeaders || {},
-  };
-  streamCache.set(videoId, info);
-  return info;
+  let lastError;
+  for (const format of formats) {
+    try {
+      const opts = YouTube.getYtDlpOptions({ dumpSingleJson: true, format });
+      const result = await ytdl(url, opts, { timeout: 30000 });
+      if (result?.url) {
+        const info = {
+          url: result.url,
+          type: result.acodec && result.acodec.includes('opus') ? 'opus' : 'arbitrary',
+          duration: result.duration || 0,
+          bitrate: result.abr || result.tbr || 0,
+          httpHeaders: result.http_headers || {},
+        };
+        streamCache.set(videoId, info);
+        return info;
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
 }
 
 export function extractVideoId(url) {

@@ -264,10 +264,11 @@ export async function handleButtonInteraction(interaction) {
             return;
         }
 
-        // Fallback
+        // Fallback - acknowledge with defer to avoid 3s expiry
         if (!interaction.deferred && !interaction.replied) {
             try {
-                await interaction.reply({ content: '❌ الزر غير معروف أو منتهي الصلاحية.', flags: MessageFlags.Ephemeral });
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                await interaction.editReply({ content: '❌ الزر غير معروف أو منتهي الصلاحية.' });
             } catch (fallbackErr) {
                 if (fallbackErr.code !== 10062) console.error('Fallback reply error:', fallbackErr);
             }
@@ -276,7 +277,8 @@ export async function handleButtonInteraction(interaction) {
         if (error.code !== 10062) console.error('Error in handleButtonInteraction:', error);
         try {
             if (!interaction.deferred && !interaction.replied) {
-                await interaction.reply({ content: '❌ حدث خطأ أثناء معالجة الطلب.', flags: MessageFlags.Ephemeral });
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                await interaction.editReply({ content: '❌ حدث خطأ أثناء معالجة الطلب.' });
             }
         } catch (e) {
             if (e.code !== 10062 && e.code !== 40060) console.error('Error reply failed:', e);

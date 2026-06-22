@@ -153,6 +153,7 @@ async function removeAdminRoles(member, reason) {
     if (role.permissions.any(ADMIN_PERMISSIONS) && role.comparePositionTo(botMember.roles.highest) < 0) {
       await member.roles.remove(role.id, reason).catch(() => {});
       removed.push(role.id);
+      await new Promise(r => setTimeout(r, 350));
     }
   }
   return removed;
@@ -173,6 +174,7 @@ async function punishRemoveAdminRoles(member, guild, reason) {
   if (!member || !guild) return false;
   try {
     const removed = await removeAdminRoles(member, reason);
+    await new Promise(r => setTimeout(r, 500));
     await member.timeout(3600000, reason).catch(() => {});
     await logPunishment(guild, member, reason, removed.length, false);
     return true;
@@ -196,7 +198,9 @@ async function punishMember(member, guild, reason) {
     });
     for (const roleId of targetRoles) {
       await member.roles.remove(roleId, reason).catch(() => {});
+      await new Promise(r => setTimeout(r, 350));
     }
+    await new Promise(r => setTimeout(r, 500));
     await member.timeout(3600000, reason).catch(() => {});
     await logPunishment(guild, member, reason, targetRoles.length, false);
     return true;

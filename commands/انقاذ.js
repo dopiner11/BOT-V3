@@ -25,23 +25,35 @@ export default {
 
       await interaction.editReply('🔄 جاري البحث في سجل التدقيق...');
 
-      const auditLogs = await interaction.guild.fetchAuditLogs({
-        type: 23,
-        limit: 100,
-      });
-
       const unbannedUsers = [];
       const seen = new Set();
+      let lastId = null;
+      let hasMore = true;
 
-      for (const entry of auditLogs.entries.values()) {
-        if (entry.createdTimestamp < since) break;
-        if (entry.action !== 23) continue;
-        if (seen.has(entry.targetId)) continue;
-        seen.add(entry.targetId);
-        try {
-          const user = await interaction.client.users.fetch(entry.targetId);
-          unbannedUsers.push(user);
-        } catch {}
+      while (hasMore) {
+        const fetched = await interaction.guild.fetchAuditLogs({
+          type: 23,
+          limit: 100,
+          before: lastId,
+        });
+
+        const entries = [...fetched.entries.values()];
+        if (entries.length === 0) break;
+
+        let timeExpired = false;
+        for (const entry of entries) {
+          if (entry.createdTimestamp < since) { timeExpired = true; break; }
+          if (entry.action !== 23) continue;
+          if (seen.has(entry.targetId)) continue;
+          seen.add(entry.targetId);
+          try {
+            const user = await interaction.client.users.fetch(entry.targetId);
+            unbannedUsers.push(user);
+          } catch {}
+          lastId = entry.id;
+        }
+
+        if (timeExpired || entries.length < 100) hasMore = false;
       }
 
       if (unbannedUsers.length === 0) {

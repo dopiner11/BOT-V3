@@ -1019,10 +1019,13 @@
     "kickThreshold": 3,
     "timeoutThreshold": 5,
     "messageDeleteThreshold": 10,
+    "bulkDeleteThreshold": 2,
     "mentionThreshold": 5,
+    "mentionRepeatThreshold": 2,
     "spamThreshold": 5,
     "emojiCreateThreshold": 3,
     "emojiUpdateThreshold": 3,
+    "guildUpdateThreshold": 2,
     "spamTimeoutMinutes": 10
   }
 }

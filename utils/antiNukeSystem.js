@@ -459,10 +459,15 @@ export async function handleGuildUpdate(oldGuild, newGuild) {
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
   if (!member || isExempt(member, config)) return;
-  if (await hasAdminRoles(member)) {
-    await punishRemoveAdminRoles(member, guild, 'تغيير إعدادات السيرفر - سحب صلاحيات إدارية - Anti Nuke');
-  } else {
-    await punishMember(member, guild, 'تغيير إعدادات السيرفر (اسم/صورة) - Anti Nuke');
+  const count = recordAction(executor.id, 'guild_update', 60000);
+  const antiNuke = getAntiNukeConfig();
+  const threshold = antiNuke.guildUpdateThreshold || 2;
+  if (count >= threshold) {
+    if (await hasAdminRoles(member)) {
+      await punishRemoveAdminRoles(member, guild, `تغيير إعدادات السيرفر متكرر (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
+    } else {
+      await punishMember(member, guild, `تغيير إعدادات السيرفر متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
+    }
   }
 }
 
@@ -534,10 +539,15 @@ export async function handleMessageDeleteBulk(messages) {
     const config = loadConfig();
     const member = guild.members.cache.get(deletedBy.id);
     if (member && !isExempt(member, config)) {
-      if (await hasAdminRoles(member)) {
-        await punishRemoveAdminRoles(member, guild, `حذف جماعي للرسائل (${messages.size}) - سحب صلاحيات إدارية - Anti Nuke`);
-      } else {
-        await punishMember(member, guild, `حذف جماعي للرسائل (${messages.size} رسالة) - Anti Nuke`);
+      const count = recordAction(deletedBy.id, 'bulk_delete', 60000);
+      const antiNuke = getAntiNukeConfig();
+      const threshold = antiNuke.bulkDeleteThreshold || 2;
+      if (count >= threshold) {
+        if (await hasAdminRoles(member)) {
+          await punishRemoveAdminRoles(member, guild, `حذف جماعي للرسائل متكرر (${count} مرة) - سحب صلاحيات إدارية - Anti Nuke`);
+        } else {
+          await punishMember(member, guild, `حذف جماعي للرسائل متكرر (${count} مرة) - Anti Nuke`);
+        }
       }
     }
   }
@@ -550,16 +560,20 @@ export async function handleMassMention(message) {
   const roleMentions = message.mentions.roles.size;
   const totalMentions = userMentions + roleMentions + (mentionsEveryone ? 10 : 0);
   const antiNuke = getAntiNukeConfig();
-  const threshold = antiNuke.mentionThreshold || 5;
-  if (totalMentions < threshold) return;
+  const mentionThreshold = antiNuke.mentionThreshold || 5;
+  if (totalMentions < mentionThreshold) return;
   const config = loadConfig();
   const member = message.guild.members.cache.get(message.author.id);
   if (!member || isExempt(member, config)) return;
   await message.delete().catch(() => {});
-  if (await hasAdminRoles(member)) {
-    await punishRemoveAdminRoles(member, message.guild, `منشن جماعي (${totalMentions}) - سحب صلاحيات إدارية - Anti Nuke`);
-  } else {
-    await punishMember(member, message.guild, `منشن جماعي (${totalMentions} منشن) - Anti Nuke`);
+  const count = recordAction(message.author.id, 'mass_mention', 60000);
+  const repeatThreshold = antiNuke.mentionRepeatThreshold || 2;
+  if (count >= repeatThreshold) {
+    if (await hasAdminRoles(member)) {
+      await punishRemoveAdminRoles(member, message.guild, `منشن جماعي متكرر (${count} مرة خلال دقيقة) - سحب صلاحيات إدارية - Anti Nuke`);
+    } else {
+      await punishMember(member, message.guild, `منشن جماعي متكرر (${count} مرة خلال دقيقة) - Anti Nuke`);
+    }
   }
 }
 

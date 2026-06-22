@@ -1,6 +1,0 @@
-✅ Modal Handler Module Loaded (V3)
-🚀 Bot logged in as family management bot#6043
-✅ Slash commands updated.
-💰 Loaded 0 active auctions.
-🔄 Starting delayed system restorations (Committees, Top)...
-🔄 Started refreshing committee panels...

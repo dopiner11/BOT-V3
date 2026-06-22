@@ -1,187 +1,74 @@
-import { spawn, execFile } from 'child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { execFile } from 'child_process';
+import { existsSync, writeFileSync, chmodSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { Readable } from 'stream';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..');
-const LAVALINK_DIR = join(ROOT, 'lavalink');
-const PLUGINS_DIR = join(LAVALINK_DIR, 'plugins');
-const JAR_PATH = join(LAVALINK_DIR, 'Lavalink.jar');
+const BIN_PATH = join(__dirname, '..', 'yt-dlp');
+const _cookiesPath = join(__dirname, '..', 'cookies.txt');
+const _hasCookies = existsSync(_cookiesPath);
 
-const LAVALINK_PORT = 2333;
-const LAVALINK_PASSWORD = 'youshallnotpass';
-const BASE = `http://127.0.0.1:${LAVALINK_PORT}`;
-const HEADERS = { Authorization: LAVALINK_PASSWORD, 'Content-Type': 'application/json' };
-
-let lavalinkProcess = null;
+let downloadAttempted = false;
 let ready = false;
-let failed = false;
-let readyResolve = null;
-let readyReject = null;
-const MAX_START_ATTEMPTS = 2;
-let startAttempts = 0;
 
-// ─── Process Management ──────────────────────────────────────────
+// ─── Download latest yt-dlp from GitHub ─────────────────────────
 
-async function downloadJar() {
-  console.log('[Lavalink] Downloading Lavalink.jar ...');
-  const url = 'https://github.com/lavalink-devs/Lavalink/releases/download/4.2.2/Lavalink.jar';
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to download Lavalink.jar: HTTP ' + res.status);
-  const buffer = Buffer.from(await res.arrayBuffer());
-  writeFileSync(JAR_PATH, buffer);
-  console.log('[Lavalink] Lavalink.jar downloaded (' + (buffer.length / 1024 / 1024).toFixed(1) + ' MB)');
-}
-
-async function ensureJar() {
-  if (!existsSync(JAR_PATH)) await downloadJar();
-}
-
-async function start() {
-  if (lavalinkProcess || failed) return;
-
-  // Create fresh promise for this attempt
-  let _resolve, _reject;
-  const promise = new Promise((resolve, reject) => { _resolve = resolve; _reject = reject; });
-  readyResolve = _resolve;
-  readyReject = _reject;
-
-  startAttempts++;
+async function download() {
+  if (downloadAttempted) return;
+  downloadAttempted = true;
   try {
-    // Check Java
-    try {
-      await execFileAsync('java', ['-version'], { timeout: 10000 });
-    } catch {
-      console.warn('[Lavalink] Java not found - Lavalink unavailable');
-      failed = true;
-      if (_reject) _reject(new Error('Java not found'));
-      return;
-    }
-
-    if (!existsSync(PLUGINS_DIR)) mkdirSync(PLUGINS_DIR, { recursive: true });
-    await ensureJar();
-
-    console.log('[Lavalink] Starting Lavalink server ...');
-    lavalinkProcess = spawn('java', [
-      '-jar', JAR_PATH,
-      '--spring.config.location=' + join(LAVALINK_DIR, 'application.yml'),
-    ], { cwd: LAVALINK_DIR, stdio: ['ignore', 'pipe', 'pipe'] });
-
-    lavalinkProcess.stdout.on('data', (data) => {
-      if (data.toString().includes('Started Launcher') || data.toString().includes('Lavalink is ready')) {
-        ready = true;
-        if (readyResolve) { readyResolve(); readyResolve = null; readyReject = null; }
-        console.log('[Lavalink] Ready!');
-      }
-    });
-
-    lavalinkProcess.stderr.on('data', (data) => {
-      if (data.toString().includes('Started Launcher') || data.toString().includes('Lavalink is ready')) {
-        ready = true;
-        if (readyResolve) { readyResolve(); readyResolve = null; readyReject = null; }
-        console.log('[Lavalink] Ready!');
-      }
-    });
-
-    lavalinkProcess.on('error', (err) => {
-      console.error('[Lavalink] Process error:', err.message);
-      if (readyReject) { readyReject(err); readyResolve = null; readyReject = null; }
-    });
-
-    lavalinkProcess.on('exit', (code) => {
-      console.warn('[Lavalink] Exited with code', code);
-      ready = false;
-      lavalinkProcess = null;
-      if (startAttempts < MAX_START_ATTEMPTS) {
-        setTimeout(() => start(), 2000);
-      } else {
-        failed = true;
-        if (readyReject) { readyReject(new Error('Lavalink exited')); readyResolve = null; readyReject = null; }
-      }
-    });
-
-    // Wait for ready (timeout 30s)
-    await Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Lavalink startup timeout')), 30000)),
-    ]);
-
-    startAttempts = 0;
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const url = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp' + ext;
+    console.log('[Audio] Downloading yt-dlp ...');
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buf = Buffer.from(await res.arrayBuffer());
+    writeFileSync(BIN_PATH + ext, buf);
+    if (process.platform !== 'win32') chmodSync(BIN_PATH + ext, 0o755);
+    console.log('[Audio] yt-dlp downloaded (' + (buf.length / 1024 / 1024).toFixed(1) + ' MB)');
+    ready = true;
   } catch (err) {
-    console.error('[Lavalink] Failed:', err.message);
-    lavalinkProcess = null;
+    console.warn('[Audio] Failed to download yt-dlp:', err.message);
     ready = false;
-    if (readyReject) { readyReject(err); readyResolve = null; readyReject = null; }
-    if (startAttempts >= MAX_START_ATTEMPTS) failed = true;
   }
 }
 
-function stop() {
-  if (lavalinkProcess) { lavalinkProcess.kill('SIGTERM'); lavalinkProcess = null; }
-  ready = false;
-  if (readyReject) { readyReject(new Error('Lavalink stopped')); readyResolve = null; readyReject = null; }
+// ─── Resolve YouTube audio stream ─────────────────────────────────
+
+async function getStream(videoId) {
+  if (!downloadAttempted) await download();
+  if (!ready) throw new Error('yt-dlp not available');
+
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const bin = BIN_PATH + ext;
+
+  if (!existsSync(bin)) throw new Error('yt-dlp binary not found');
+
+  const args = [
+    'https://www.youtube.com/watch?v=' + videoId,
+    '--format', 'bestaudio/best',
+    '--no-playlist',
+    '--no-warnings',
+    '-g',
+  ];
+  if (_hasCookies) args.push('--cookies', _cookiesPath);
+  args.push('--extractor-args', 'youtubetab:skip=none');
+
+  const { stdout } = await execFileAsync(bin, args, { timeout: 30000 });
+  const audioUrl = (stdout || '').trim();
+  if (!audioUrl) throw new Error('Empty response from yt-dlp');
+
+  const res = await fetch(audioUrl, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error('Fetch HTTP ' + res.status);
+  if (!res.body) throw new Error('Empty body');
+
+  return Readable.fromWeb(res.body);
 }
 
-async function waitForReady() {
-  if (failed) throw new Error('Lavalink unavailable');
-  if (ready) return;
-  let _resolve, _reject;
-  const p = new Promise((resolve, reject) => { _resolve = resolve; _reject = reject; });
-  readyResolve = _resolve;
-  readyReject = _reject;
-  if (!lavalinkProcess && !failed) start().catch(() => {});
-  await p.catch(() => { throw new Error('Lavalink unavailable'); });
-}
-
-// ─── REST API ─────────────────────────────────────────────────────
-
-async function tryGetStream(videoId) {
-  if (failed) throw new Error('Lavalink unavailable');
-  if (!ready) {
-    try {
-      await Promise.race([
-        waitForReady(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Lavalink wait timeout')), 15000)),
-      ]);
-    } catch {
-      throw new Error('Lavalink not ready');
-    }
-  }
-
-  const errs = [];
-
-  // Try download endpoint first
-  try {
-    const res = await fetch(BASE + '/youtube/download/' + videoId, {
-      headers: HEADERS, signal: AbortSignal.timeout(20000),
-    });
-    if (res.ok && res.body) {
-      console.log('[Lavalink] Downloaded', videoId);
-      return Readable.fromWeb(res.body);
-    }
-    errs.push('download HTTP ' + res.status);
-  } catch (e) { errs.push(e.message); }
-
-  // Fallback: load track and try identifier-based stream
-  try {
-    const res = await fetch(BASE + '/v4/loadtracks?identifier=' + encodeURIComponent('https://www.youtube.com/watch?v=' + videoId), {
-      headers: HEADERS, signal: AbortSignal.timeout(10000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.data?.[0]) {
-        console.log('[Lavalink] Track loaded:', data.data[0].info?.title || videoId);
-      }
-    }
-    errs.push('loadtracks ' + res.status);
-  } catch (e) { errs.push(e.message); }
-
-  throw new Error(errs.join(' | '));
-}
-
-export { start, stop, waitForReady, tryGetStream };
+export { download, getStream, ready };

@@ -46,6 +46,12 @@ import pointsManager, { setPointsManagerContext } from './utils/pointsManager.js
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Auto-clean git state so AUTO_UPDATE=1 can pull new versions
+import { execSync } from 'child_process';
+try {
+  execSync('git checkout -- . && git clean -fd', { stdio: 'pipe', timeout: 10000 });
+} catch {} // best effort
+
 const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
 
 process.on('unhandledRejection', (reason, p) => {
@@ -178,9 +184,9 @@ client.once(Events.ClientReady, async () => {
       startExcuseNotifications(client);
       startVoteExpiryChecker(client);
       startDailyChallenge(client);
-      // Start Lavalink (Java YouTube source) in background
+      // Download latest yt-dlp binary in background
       import('./utils/lavalinkManager.js').then(m =>
-        m.start().catch(e => console.error('[Lavalink] startup:', e?.message))
+        m.download().catch(e => console.warn('[Audio] yt-dlp download:', e?.message))
       );
       const { initQuranPlayer } = await import('./utils/quranPlayer.js');
       initQuranPlayer(client);

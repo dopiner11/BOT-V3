@@ -312,17 +312,17 @@ async function fetchPlaylistVideoIds(playlistId) {
 }
 
 // ─── Audio Resolution ────────────────────────────────────────────
-// Chain: Lavalink (Java, dev.lavalink.youtube) → yt-dlp → ytdl-core
+// Chain: latest yt-dlp (downloaded) → bundled yt-dlp → ytdl-core
 async function getAudioStream(videoId) {
   const errors = [];
 
-  // ── Strategy 1: Lavalink (Java YouTube source, same as JMusicBot) ─
+  // ── Strategy 1: Latest yt-dlp (downloaded from GitHub) ─────────
   try {
-    const { tryGetStream } = await import('./lavalinkManager.js');
-    const stream = await tryGetStream(videoId);
+    const { getStream } = await import('./lavalinkManager.js');
+    const stream = await getStream(videoId);
     if (stream) return stream;
   } catch (err) {
-    errors.push('lavalink: ' + (err.message || '').slice(0, 80));
+    errors.push('dl-yt-dlp: ' + (err.message || '').slice(0, 80));
   }
 
   // ── Strategy 2: yt-dlp via any available method ─────────────────
@@ -368,7 +368,7 @@ async function getAudioStream(videoId) {
     }
   }
 
-  // ── Strategy 2: @distube/ytdl-core ──────────────────────────────
+  // ── Strategy 3: @distube/ytdl-core (fallback) ───────────────────
   try {
     const stream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' });
     const ok = await Promise.race([

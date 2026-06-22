@@ -6,6 +6,7 @@ import { Readable } from 'stream';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { gold as embedGold } from './embedStyles.js';
+import { getStream as ytGetStream, getPlaylistVideoIds, extractVideoId } from './ytAudio.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -125,6 +126,8 @@ const SURAHS = [
   { id: 113, name: 'الفلق', ayahCount: 5 },
   { id: 114, name: 'الناس', ayahCount: 6 },
 ];
+const playlistVideosCache = new Map();
+
 function getReciters() {
   const config = loadConfig();
   const reciters = {};
@@ -137,13 +140,19 @@ function getReciters() {
       if (r.id) {
         reciters[r.id] = {
           name: r.name,
-          baseUrl: r.baseUrl || null
+          baseUrl: r.baseUrl || null,
+          youtubePlaylistId: r.youtubePlaylistId || null
         };
       }
     }
     return reciters;
   }
   return defaults;
+}
+
+function getCookiesPath() {
+  const config = loadConfig();
+  return config.quran?.cookiesPath || null;
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -516,7 +525,20 @@ class QuranPlayer {
 
   async playUrl(url) {
     try {
-      const stream = await streamUrl(url);
+      let stream;
+      const videoId = extractVideoId(url);
+      if (videoId) {
+        const streamInfo = await ytGetStream(videoId, getCookiesPath());
+        const res = await fetch(streamInfo.url, {
+          headers: streamInfo.httpHeaders || {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        stream = Readable.fromWeb(res.body);
+      } else {
+        stream = await streamUrl(url);
+      }
       consecutiveErrors = 0;
       this.resource = createAudioResource(stream, {
         inputType: StreamType.Arbitrary,
@@ -547,6 +569,21 @@ class QuranPlayer {
     }
   }
 
+  async playPlaylistSurah(reciter, surah) {
+    const playlistUrl = reciter.youtubePlaylistId;
+    let videoIds = playlistVideosCache.get(playlistUrl);
+    if (!videoIds) {
+      videoIds = await getPlaylistVideoIds(playlistUrl, getCookiesPath());
+      playlistVideosCache.set(playlistUrl, videoIds);
+    }
+    const index = surah.id - 1;
+    if (index >= videoIds.length) {
+      console.warn('[QuranPlayer] Surah index out of playlist range');
+      return;
+    }
+    await this.playUrl('https://www.youtube.com/watch?v=' + videoIds[index]);
+  }
+
   async playCurrent() {
     if (this.queue.length === 0 || this.queueIndex >= this.queue.length) {
       if (this.contentType === 'quran') {
@@ -560,13 +597,17 @@ class QuranPlayer {
     if (this.contentType === 'quran') {
       const surahId = this.queue[this.queueIndex];
       const reciter = getReciters()[this.reciterId];
-      if (!reciter?.baseUrl) return;
+      if (!reciter) return;
       const surah = SURAHS.find(s => s.id === surahId);
       if (!surah) return;
       this.currentSurah = surah;
       this.currentItem = null;
-      const url = reciter.baseUrl + '/' + String(surahId).padStart(3, '0') + '.mp3';
-      await this.playUrl(url);
+      if (reciter.baseUrl) {
+        const url = reciter.baseUrl + '/' + String(surahId).padStart(3, '0') + '.mp3';
+        await this.playUrl(url);
+      } else if (reciter.youtubePlaylistId) {
+        await this.playPlaylistSurah(reciter, surah);
+      }
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       const item = items.find(it => it.name === this.currentItem);
@@ -586,8 +627,12 @@ class QuranPlayer {
       this.queue = [randomSurah.id];
       this.queueIndex = 0;
       const reciter = getReciters()[this.reciterId];
-      if (!reciter?.baseUrl) return;
-      this.playUrl(reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3');
+      if (!reciter) return;
+      if (reciter.baseUrl) {
+        this.playUrl(reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3');
+      } else if (reciter.youtubePlaylistId) {
+        this.playPlaylistSurah(reciter, randomSurah);
+      }
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       if (items.length === 0) return;

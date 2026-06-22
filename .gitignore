@@ -25,7 +25,11 @@ dist-ssr
 data/
 .data/
 
-سورة البقرة ( كاملة ) مجودة ｜｜ القارئ عامر الكاظمي ｜｜ الطريقة العراقية \[4envQr0hFEI\].mp4.part
-سورة البقرة ( كاملة ) مجودة ｜｜ القارئ عامر الكاظمي ｜｜ الطريقة العراقية \[4envQr0hFEI\].webm
-سورة البقرة ( كاملة ) مجودة ｜｜ القارئ عامر الكاظمي ｜｜ الطريقة العراقية \[4envQr0hFEI\].mp4.part
-سورة البقرة ( كاملة ) مجودة ｜｜ القارئ عامر الكاظمي ｜｜ الطريقة العراقية \[4envQr0hFEI\].webm
+# Raw browser cookie export (do NOT commit)
+cookies.txt
+user_cookies.txt
+
+# Downloaded temp files
+*.part
+*.webm
+*.mp4

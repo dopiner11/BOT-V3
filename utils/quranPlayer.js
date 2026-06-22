@@ -326,45 +326,49 @@ async function getAudioStream(videoId) {
   }
 
   // ── Strategy 2: yt-dlp via any available method ─────────────────
-  const baseArgs = [
-    '--format', 'bestaudio[ext=webm]/bestaudio/best',
-    '--no-playlist', '--no-warnings', '-g',
+  const argSets = [
+    ['--format', 'bestaudio[ext=webm]/bestaudio/best', '--no-playlist', '--no-warnings', '-g', '--extractor-args', 'youtube:player_client=android', '--js-runtimes', 'node'],
+    ...(_hasCookies ? [
+      ['--format', 'bestaudio[ext=webm]/bestaudio/best', '--no-playlist', '--no-warnings', '-g', '--extractor-args', 'youtube:player_client=android', '--js-runtimes', 'node', '--cookies', _cookiesPath],
+      ['--format', 'bestaudio[ext=webm]/bestaudio/best', '--no-playlist', '--no-warnings', '-g', '--cookies', _cookiesPath],
+    ] : []),
   ];
-  if (_hasCookies) { baseArgs.push('--cookies', _cookiesPath); }
 
-  for (const entry of _ytdlpCmds) {
-    try {
-      let stdout, stderr;
-      if (entry.method === 'exec') {
-        const shellCmd = entry.cmd + ' https://www.youtube.com/watch?v=' + videoId + ' ' + baseArgs.join(' ');
-        const result = await execAsync(shellCmd, { timeout: 25000, shell: true });
-        stdout = result.stdout;
-        stderr = result.stderr;
-      } else {
-        const args = entry.args ? [...entry.args, `https://www.youtube.com/watch?v=${videoId}`, ...baseArgs]
-                                : [`https://www.youtube.com/watch?v=${videoId}`, ...baseArgs];
-        const result = await execFileAsync(entry.cmd, args, { timeout: 25000 });
-        stdout = result.stdout;
-        stderr = result.stderr;
-      }
-      const audioUrl = (stdout || '').trim();
-      if (audioUrl) {
-        const res = await fetch(audioUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(12000),
-        });
-        if (res.ok && res.body) {
-          console.log('[QuranPlayer] yt-dlp(' + entry.via + ') resolved', videoId);
-          return Readable.fromWeb(res.body);
+  for (const baseArgs of argSets) {
+    for (const entry of _ytdlpCmds) {
+      try {
+        let stdout, stderr;
+        if (entry.method === 'exec') {
+          const shellCmd = entry.cmd + ' https://www.youtube.com/watch?v=' + videoId + ' ' + baseArgs.join(' ');
+          const result = await execAsync(shellCmd, { timeout: 25000, shell: true });
+          stdout = result.stdout;
+          stderr = result.stderr;
+        } else {
+          const args = entry.args ? [...entry.args, `https://www.youtube.com/watch?v=${videoId}`, ...baseArgs]
+                                  : [`https://www.youtube.com/watch?v=${videoId}`, ...baseArgs];
+          const result = await execFileAsync(entry.cmd, args, { timeout: 25000 });
+          stdout = result.stdout;
+          stderr = result.stderr;
         }
-        errors.push(entry.via + ': HTTP ' + res.status);
-      } else {
-        const reason = (stderr || 'empty stdout').split('\n').pop().trim().slice(0, 60);
-        errors.push(entry.via + ': ' + reason);
+        const audioUrl = (stdout || '').trim();
+        if (audioUrl) {
+          const res = await fetch(audioUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(12000),
+          });
+          if (res.ok && res.body) {
+            console.log('[QuranPlayer] yt-dlp(' + entry.via + ') resolved', videoId);
+            return Readable.fromWeb(res.body);
+          }
+          errors.push(entry.via + ': HTTP ' + res.status);
+        } else {
+          const reason = (stderr || 'empty stdout').split('\n').pop().trim().slice(0, 60);
+          errors.push(entry.via + ': ' + reason);
+        }
+      } catch (err) {
+        const detail = err.stderr || err.message || err.code || String(err);
+        errors.push(entry.via + ': ' + detail.split('\n').pop().trim().slice(0, 80));
       }
-    } catch (err) {
-      const detail = err.stderr || err.message || err.code || String(err);
-      errors.push(entry.via + ': ' + detail.split('\n').pop().trim().slice(0, 80));
     }
   }
 

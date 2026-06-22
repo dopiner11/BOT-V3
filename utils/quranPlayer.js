@@ -1035,7 +1035,7 @@ async function ensurePlayer(guildId, client, textChannel) {
       }
     }
 
-    const player = new QuranPlayer(guildId, vc, targetTextChannel);
+    const player = new QuranPlayer(guildId, vc, targetTextChannel, savedState);
     players.set(guildId, player);
     await player.sendInitialEmbed();
     console.log('[QuranPlayer] Initialized player for guild', guildId);

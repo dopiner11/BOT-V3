@@ -13,9 +13,23 @@ const STREAM_CACHE_TTL = 10 * 60 * 1000;
 const searchMemCache = new Map();
 const streamCache = new Map();
 const pendingSearches = new Map();
+const COOKIES_FILE = resolve(__dirname, '../youtube_cookies.txt');
+const hasCookies = existsSync(COOKIES_FILE);
 
 function ensureDir() {
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+function baseOpts(extra = {}) {
+  const opts = {
+    dumpSingleJson: true,
+    noCheckCertificates: true,
+    noWarnings: true,
+    retries: 2,
+    ...extra,
+  };
+  if (hasCookies) opts.cookies = COOKIES_FILE;
+  return opts;
 }
 
 function loadSearchCache() {
@@ -50,13 +64,7 @@ export async function search(query) {
 
   const promise = (async () => {
     const searchQuery = `ytsearch1:${query}`;
-    const result = await youtubedl(searchQuery, {
-      dumpSingleJson: true,
-      flatPlaylist: true,
-      noCheckCertificates: true,
-      noWarnings: true,
-      retries: 2,
-    });
+    const result = await youtubedl(searchQuery, baseOpts({ flatPlaylist: true }));
 
     if (!result || !result.entries || !result.entries.length) {
       throw new Error(`No results for: ${query}`);
@@ -88,13 +96,7 @@ export async function getStream(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, {
-    dumpSingleJson: true,
-    noCheckCertificates: true,
-    noWarnings: true,
-    retries: 2,
-    format: 'bestaudio[ext=webm]/bestaudio',
-  });
+  const info = await youtubedl(url, baseOpts({ format: 'bestaudio[ext=webm]/bestaudio' }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 
@@ -119,13 +121,7 @@ export async function getStream(videoId) {
 
 export async function getStreamInfo(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, {
-    dumpSingleJson: true,
-    noCheckCertificates: true,
-    noWarnings: true,
-    retries: 2,
-    format: 'bestaudio[ext=webm]/bestaudio',
-  });
+  const info = await youtubedl(url, baseOpts({ format: 'bestaudio[ext=webm]/bestaudio' }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 

@@ -1007,7 +1007,7 @@
     "_label": "🛡️ نظام الحماية المتطور - Anti Nuke",
     "enabled": true,
     "logChannelId": "1511759665615339720",
-    "bypassRoleIds": [],
+    "bypassRoleIds": ["1398940398008926250", " 1390306526136373312"],
     "roleEditThreshold": 3,
     "roleCreateThreshold": 3,
     "channelCreateThreshold": 3,

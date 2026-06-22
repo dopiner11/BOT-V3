@@ -373,6 +373,13 @@ export const commandRegistry = {
     description: 'فك الباند عن جميع الأعضاء الممنوعين من السيرفر',
     usage: '/فك_الباند_الجماعي',
   },
+  'انقاذ': {
+    category: 'punishments',
+    committee: 'punishment',
+    action: 'unbanAll',
+    description: 'فك الباند عن الكل وإرسال رسالة إنقاذ للجميع',
+    usage: '/انقاذ الرسالة: ...',
+  },
 };
 
 /**

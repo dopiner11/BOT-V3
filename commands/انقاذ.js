@@ -1,41 +1,62 @@
 import { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { unbanAll } from '../utils/antiNukeSystem.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export default {
   data: new SlashCommandBuilder()
     .setName('انقاذ')
-    .setDescription('فك الباند عن الكل وإرسال رسالة إنقاذ للجميع')
+    .setDescription('إرسال رسالة إنقاذ للأعضاء اللي انفك باندهم')
     .addStringOption(option =>
       option.setName('الرسالة')
         .setDescription('محتوى الرسالة اللي تنرسل للجميع')
-        .setRequired(true)),
+        .setRequired(true))
+    .addIntegerOption(option =>
+      option.setName('المدة')
+        .setDescription('خلل كم دقيقة ندور على اللي انفك باندهم (افتراضي 60)')
+        .setRequired(false)
+        .setMinValue(5)
+        .setMaxValue(1440)),
 
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const messageContent = interaction.options.getString('الرسالة');
-      const bans = await interaction.guild.bans.fetch();
-      const totalBans = bans.size;
+      const minutes = interaction.options.getInteger('المدة') || 60;
+      const since = Date.now() - minutes * 60 * 1000;
 
-      if (totalBans === 0) {
-        return interaction.editReply('✅ لا يوجد أي عضو محظور في السيرفر.');
+      await interaction.editReply('🔄 جاري البحث في سجل التدقيق...');
+
+      const auditLogs = await interaction.guild.fetchAuditLogs({
+        type: 23,
+        limit: 100,
+      });
+
+      const unbannedUsers = [];
+      const seen = new Set();
+
+      for (const entry of auditLogs.entries.values()) {
+        if (entry.createdTimestamp < since) break;
+        if (entry.action !== 23) continue;
+        if (seen.has(entry.targetId)) continue;
+        seen.add(entry.targetId);
+        try {
+          const user = await interaction.client.users.fetch(entry.targetId);
+          unbannedUsers.push(user);
+        } catch {}
+      }
+
+      if (unbannedUsers.length === 0) {
+        return interaction.editReply('❌ لم يتم العثور على أي أعضاء تم فك باندهم خلال الـ ' + minutes + ' دقيقة الماضية.');
       }
 
       const confirmEmbed = new EmbedBuilder()
         .setTitle('⚠️ تأكيد عملية الإنقاذ')
-        .setDescription(`هل أنت متأكد من فك الباند عن **${totalBans}** عضو وإرسال رسالة إنقاذ للجميع؟`)
+        .setDescription(`سيتم إرسال رسالة إنقاذ إلى **${unbannedUsers.length}** عضو`)
         .setColor(0xF39C12)
         .addFields(
-          { name: 'عدد الأعضاء', value: `${totalBans}`, inline: true },
+          { name: 'عدد الأعضاء', value: `${unbannedUsers.length}`, inline: true },
+          { name: 'الفترة', value: `آخر ${minutes} دقيقة`, inline: true },
           { name: 'الرسالة', value: messageContent.slice(0, 500), inline: false },
-          { name: 'بواسطة', value: `${interaction.user.tag}`, inline: true },
+          { name: 'بواسطة', value: interaction.user.tag, inline: true },
         )
         .setTimestamp();
 
@@ -60,26 +81,18 @@ export default {
 
       await collected.deferUpdate();
 
-      await interaction.editReply({ content: `🔄 جاري فك الباند وإرسال الرسائل... (0/${totalBans})`, components: [], embeds: [] });
+      await interaction.editReply({ content: `🔄 جاري إرسال الرسائل... (0/${unbannedUsers.length})`, components: [], embeds: [] });
 
-      let unbanned = 0;
       let dmsSent = 0;
       let dmsFailed = 0;
-      let failed = 0;
       const inviteLink = interaction.guild.vanityURL
         ? `discord.gg/${interaction.guild.vanityURL}`
         : null;
 
-      try {
-        for (const ban of bans.values()) {
-          try {
-            await interaction.guild.bans.remove(ban.user.id, `عملية إنقاذ بواسطة ${interaction.user.tag}`);
-            unbanned++;
-          } catch {
-            failed++;
-            continue;
-          }
-
+      const batchSize = 10;
+      for (let i = 0; i < unbannedUsers.length; i += batchSize) {
+        const batch = unbannedUsers.slice(i, i + batchSize);
+        await Promise.allSettled(batch.map(async (user) => {
           try {
             const embed = new EmbedBuilder()
               .setTitle('🆘 تم إنقاذك!')
@@ -91,35 +104,29 @@ export default {
               )
               .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
               .setTimestamp();
-
             if (inviteLink) {
               embed.addFields({ name: 'رابط السيرفر', value: inviteLink, inline: false });
             }
-
-            await ban.user.send({ embeds: [embed] }).catch(() => {});
+            await user.send({ embeds: [embed] });
             dmsSent++;
           } catch {
             dmsFailed++;
           }
-
-          if ((unbanned + failed) % 10 === 0) {
-            await interaction.editReply({
-              content: `🔄 جاري فك الباند وإرسال الرسائل... (${unbanned + failed}/${totalBans})`,
-            }).catch(() => {});
-          }
-
-          await new Promise(r => setTimeout(r, 3000));
-        }
-      } catch {}
+        }));
+        await interaction.editReply({
+          content: `🔄 جاري إرسال الرسائل... (${Math.min(i + batchSize, unbannedUsers.length)}/${unbannedUsers.length})`,
+        }).catch(() => {});
+        await new Promise(r => setTimeout(r, 1000));
+      }
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('✅ تمت عملية الإنقاذ بنجاح')
         .setColor(0x2ECC71)
         .addFields(
-          { name: 'تم فك الباند', value: `${unbanned}`, inline: true },
-          { name: 'فشل فك الباند', value: `${failed}`, inline: true },
+          { name: 'الأعضاء', value: `${unbannedUsers.length}`, inline: true },
           { name: 'رسائل وصلت', value: `${dmsSent}`, inline: true },
           { name: 'رسائل فشلت', value: `${dmsFailed}`, inline: true },
+          { name: 'الفترة', value: `آخر ${minutes} دقيقة`, inline: true },
           { name: 'بواسطة', value: interaction.user.tag, inline: true },
         )
         .setTimestamp();

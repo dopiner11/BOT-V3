@@ -2,6 +2,7 @@ import { createRequire } from 'module';
 import { resolve, dirname } from 'path';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
+import { Readable } from 'stream';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -14,17 +15,14 @@ try {
   process.env.COOKIES_FROM_BROWSER = '';
   process.env.COOKIES_FILE = resolve(__dirname, '../MusicBot-main/cookies.txt');
   YouTube = require(resolve(__dirname, '../MusicBot-main/src/YouTube.js'));
-  ytdl = require('youtube-dl-exec');
+  ytdl = require('@distube/ytdl-core');
 } finally {
   process.chdir(origCwd);
 }
 
 const CACHE_DIR = resolve(__dirname, '../.cache');
 const SEARCH_FILE = resolve(CACHE_DIR, 'ytSearch.json');
-const STREAM_FILE = resolve(CACHE_DIR, 'ytStream.json');
-const STREAM_TTL = 4 * 60 * 60 * 1000;
-
-const memStream = new Map();
+const streamMem = new Map();
 
 function ensureDir() {
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
@@ -61,48 +59,16 @@ export async function search(query) {
 }
 
 export async function getStream(videoId) {
-  if (memStream.has(videoId)) return memStream.get(videoId);
-
-  const disk = readJson(STREAM_FILE);
-  const entry = disk[videoId];
-  if (entry && Date.now() - entry.cachedAt < STREAM_TTL) {
-    memStream.set(videoId, entry);
-    return entry;
-  }
+  if (streamMem.has(videoId)) return streamMem.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const formats = ['bestaudio*', 'bestaudio/best', 'best'];
-
-  let lastError;
-  for (const format of formats) {
-    try {
-      const opts = YouTube.getYtDlpOptions({
-        dumpSingleJson: true,
-        format,
-        preferFreeFormats: true,
-      });
-      opts.retries = 1;
-      opts.fragmentRetries = 1;
-      const result = await timeout(ytdl(url, opts, { timeout: 60000 }), 65000);
-      if (result?.url) {
-        const info = {
-          url: result.url,
-          type: result.acodec && result.acodec.includes('opus') ? 'opus' : 'arbitrary',
-          duration: result.duration || 0,
-          bitrate: result.abr || result.tbr || 0,
-          httpHeaders: result.http_headers || {},
-          cachedAt: Date.now(),
-        };
-        memStream.set(videoId, info);
-        disk[videoId] = info;
-        writeJson(STREAM_FILE, disk);
-        return info;
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  throw lastError;
+  const info = await timeout(ytdl.getInfo(url), 30000);
+  const audio = ytdl.filterFormats(info.formats, 'audioonly');
+  if (!audio.length) throw new Error('No audio formats found');
+  const format = ytdl.chooseFormat(audio, { quality: 'highest' });
+  const stream = ytdl.downloadFromInfo(info, { format });
+  streamMem.set(videoId, stream);
+  return stream;
 }
 
 export function extractVideoId(url) {

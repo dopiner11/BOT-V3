@@ -13,7 +13,7 @@
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
     "@discordjs/voice": "^0.19.2",
-    "opusscript": "^0.0.8",
+    "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.13.4",
     "clsx": "^2.1.1",
     "convex": "^1.24.2",
@@ -25,6 +25,7 @@
     "node-cron": "^4.2.1",
     "node-json-db": "^2.6.0",
     "npm": "^11.8.0",
+    "opusscript": "^0.0.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sonner": "^2.0.3",

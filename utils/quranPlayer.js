@@ -520,14 +520,7 @@ class QuranPlayer {
       let stream;
       const videoId = extractVideoId(url);
       if (videoId) {
-        const streamInfo = await ytGetStream(videoId);
-        const res = await fetch(streamInfo.url, {
-          headers: streamInfo.httpHeaders || {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        stream = Readable.fromWeb(res.body);
+        stream = await ytGetStream(videoId);
       } else {
         stream = await streamUrl(url);
       }

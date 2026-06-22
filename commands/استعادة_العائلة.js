@@ -14,7 +14,7 @@ function loadConfig() {
 export default {
   data: new SlashCommandBuilder()
     .setName('استعادة_العائلة')
-    .setDescription('فحص أعضاء العائلة المتبندين وإلغاء حظرهم واستعادة روماتهم ورتبهم')
+    .setDescription('فحص رتب ورومات أعضاء العائلة واستعادتها لمن يفتقدها')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -25,89 +25,101 @@ export default {
       const guild = interaction.guild;
 
       // 1. جلب قائمة المتبندين من السيرفر
-      const bans = await guild.bans.fetch().catch(() => null);
-      if (!bans) {
-        return interaction.editReply('❌ فشل جلب قائمة المحظورين من السيرفر. تأكد من صلاحيات البوت.');
-      }
+      const bans = await guild.bans.fetch().catch(() => new Map());
 
-      // 2. جلب الأعضاء المسجلين في قاعدة البيانات
-      const dbMembers = await Member.find({});
+      // 2. جلب الأعضاء المسجلين والنشطين في قاعدة البيانات
+      const dbMembers = await Member.find({ isActive: true });
       if (dbMembers.length === 0) {
-        return interaction.editReply('❌ لا يوجد أعضاء مسجلين في قاعدة البيانات.');
+        return interaction.editReply('❌ لا يوجد أعضاء نشطين مسجلين في قاعدة البيانات.');
       }
 
-      // 3. تصفية الأعضاء المتبندين
-      const bannedMembers = dbMembers.filter(m => bans.has(m.discordId));
-
-      if (bannedMembers.length === 0) {
-        return interaction.editReply('✅ لم يتم العثور على أي عضو عائلة متبند حالياً في السيرفر.');
-      }
-
-      await interaction.editReply(`🔄 تم العثور على **${bannedMembers.length}** عضو متبند. جاري معالجة الاستعادة...`);
+      await interaction.editReply(`🔄 تم العثور على **${dbMembers.length}** عضو في قاعدة البيانات. جاري فحص الرتب والرومات وتعديل النواقص...`);
 
       let unbannedCount = 0;
       let roomsCreated = 0;
       let rolesRestored = 0;
+      let nicknamesRestored = 0;
       const detailsList = [];
 
-      for (const memberRec of bannedMembers) {
+      for (const memberRec of dbMembers) {
         try {
-          // أ. فك الباند عن العضو
-          await guild.bans.remove(memberRec.discordId, 'استعادة تلقائية لعضو العائلة').catch(() => {});
-          unbannedCount++;
-
-          // ب. حذف الروم القديم إن وجد
-          if (memberRec.roomChannelId) {
-            const oldChan = await guild.channels.fetch(memberRec.roomChannelId).catch(() => null);
-            if (oldChan) {
-              await oldChan.delete('حذف الروم القديم لعضو العائلة المتبند').catch(() => {});
-            }
+          // أ. فحص إذا كان العضو محظوراً (Banned) في السيرفر
+          if (bans.has(memberRec.discordId)) {
+            await guild.bans.remove(memberRec.discordId, 'استعادة تلقائية لعضو العائلة').catch(() => {});
+            unbannedCount++;
           }
 
-          // ج. إنشاء روم جديد للعضو
-          const catId = config.general?.categories?.memberRooms?.id;
-          let newRoom = null;
-          if (catId) {
-            let levelCategory = 'اكثر من 40';
-            const level = memberRec.level || 0;
-            if (level < 25) levelCategory = 'تحت 25';
-            else if (level < 40) levelCategory = 'تحت 40';
-
-            newRoom = await guild.channels.create({
-              name: `🏠〢${memberRec.gameName || 'عضو'}-xiraq・${memberRec.gameId || 'ايدي'}・${levelCategory}`,
-              parent: catId,
-              permissionOverwrites: [
-                { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                { id: memberRec.discordId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-              ]
-            }).catch(() => null);
-
-            if (newRoom) {
-              roomsCreated++;
-              memberRec.roomChannelId = newRoom.id;
-            }
-          }
-
-          memberRec.isActive = true; // إعادة تنشيط العضو في قاعدة البيانات
-          await memberRec.save();
-
-          // د. التحقق مما إذا كان العضو موجوداً بالفعل بالسيرفر (مثلاً لو تم فك بانده مسبقاً ودخل)
+          // ب. التحقق من وجود العضو في السيرفر
           const gm = await guild.members.fetch(memberRec.discordId).catch(() => null);
-          if (gm) {
-            // استعادة الاسم المستعار
-            if (memberRec.gameName && memberRec.gameId) {
-              await gm.setNickname(`IQ • ${memberRec.gameName} X.IRAQ 〢${memberRec.gameId}`).catch(() => {});
+
+          // ج. فحص وصيانة الروم الخاص بالعضو
+          let roomNeedsCreation = false;
+          if (memberRec.roomChannelId) {
+            const chan = guild.channels.cache.get(memberRec.roomChannelId) || await guild.channels.fetch(memberRec.roomChannelId).catch(() => null);
+            if (!chan) {
+              roomNeedsCreation = true;
+            }
+          } else {
+            roomNeedsCreation = true;
+          }
+
+          if (roomNeedsCreation) {
+            // حذف الروم القديم إن وجد تالفاً في قاعدة البيانات
+            if (memberRec.roomChannelId) {
+              const oldChan = await guild.channels.fetch(memberRec.roomChannelId).catch(() => null);
+              if (oldChan) {
+                await oldChan.delete('حذف روم قديم تالف').catch(() => {});
+              }
             }
 
-            // استعادة الرتب
+            // إنشاء روم جديد
+            const catId = config.general?.categories?.memberRooms?.id;
+            if (catId) {
+              let levelCategory = 'اكثر من 40';
+              const level = memberRec.level || 0;
+              if (level < 25) levelCategory = 'تحت 25';
+              else if (level < 40) levelCategory = 'تحت 40';
+
+              const newRoom = await guild.channels.create({
+                name: `🏠〢${memberRec.gameName || 'عضو'}-xiraq・${memberRec.gameId || 'ايدي'}・${levelCategory}`,
+                parent: catId,
+                permissionOverwrites: [
+                  { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                  { id: memberRec.discordId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                ]
+              }).catch(() => null);
+
+              if (newRoom) {
+                roomsCreated++;
+                memberRec.roomChannelId = newRoom.id;
+              }
+            }
+          }
+
+          // د. إذا كان العضو متواجد في السيرفر، نقوم بفحص وإكمال رتبه والاسم المستعار
+          if (gm) {
+            // 1. استعادة الاسم المستعار إن اختلف
+            const expectedNickname = `IQ • ${memberRec.gameName} X.IRAQ 〢${memberRec.gameId}`;
+            if (gm.nickname !== expectedNickname) {
+              await gm.setNickname(expectedNickname).catch(() => {});
+              nicknamesRestored++;
+            }
+
+            // 2. فحص وإضافة الرتب الناقصة
             const rolesToAdd = [];
-            if (config.roles?.basic?.id) rolesToAdd.push(config.roles.basic.id);
+            if (config.roles?.basic?.id && !gm.roles.cache.has(config.roles.basic.id)) {
+              rolesToAdd.push(config.roles.basic.id);
+            }
             const jobRoleId = config.roles?.jobRoles?.[memberRec.jobNumber?.toString()]?.id;
-            if (jobRoleId) rolesToAdd.push(jobRoleId);
+            if (jobRoleId && !gm.roles.cache.has(jobRoleId)) {
+              rolesToAdd.push(jobRoleId);
+            }
 
             if (memberRec.currentRank && Array.isArray(config?.promotion?.ranks)) {
               const rankConfig = config.promotion.ranks.find(r => r.name === memberRec.currentRank);
-              if (rankConfig?.roleId) rolesToAdd.push(rankConfig.roleId);
+              if (rankConfig?.roleId && !gm.roles.cache.has(rankConfig.roleId)) {
+                rolesToAdd.push(rankConfig.roleId);
+              }
             }
 
             const uniqueRoles = [...new Set(rolesToAdd.filter(Boolean))];
@@ -115,34 +127,54 @@ export default {
               await gm.roles.add(uniqueRoles).catch(() => {});
               rolesRestored++;
             }
+
+            // 3. تحديث صلاحيات الروم الحالي للعضو المتواجد
+            if (memberRec.roomChannelId) {
+              const room = guild.channels.cache.get(memberRec.roomChannelId);
+              if (room) {
+                await room.permissionOverwrites.edit(gm.id, {
+                  ViewChannel: true,
+                  SendMessages: true
+                }).catch(() => {});
+              }
+            }
           }
 
-          detailsList.push(`• **${memberRec.gameName || 'غير معروف'}** (<@${memberRec.discordId}>) - تم فك الباند ${newRoom ? 'وإنشاء روم' : ''}`);
+          // حفظ التعديلات في قاعدة البيانات
+          await memberRec.save();
+
+          if (roomNeedsCreation || (gm && (rolesRestored > 0 || nicknamesRestored > 0))) {
+            detailsList.push(`• **${memberRec.gameName || 'عضو'}** (<@${memberRec.discordId}>) - تم فحص رتبه وصيانة رومه`);
+          }
         } catch (err) {
           console.error(`Error restoring member ${memberRec.discordId}:`, err);
         }
 
         // تأخير بسيط لمنع الـ Rate limit
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
       }
 
       const resultEmbed = new EmbedBuilder()
-        .setTitle('🛠️ اكتمال استعادة أعضاء العائلة')
+        .setTitle('🛠️ صيانة واستعادة أعضاء العائلة')
         .setColor(0x2ECC71)
         .addFields(
-          { name: 'الأعضاء المكتشفين', value: `${bannedMembers.length}`, inline: true },
-          { name: 'تم فك الباند عن', value: `${unbannedCount}`, inline: true },
-          { name: 'رومات جديدة', value: `${roomsCreated}`, inline: true },
-          { name: 'رتب مسترجعة فوراً', value: `${rolesRestored}`, inline: true }
+          { name: 'الأعضاء المفحوصين', value: `${dbMembers.length}`, inline: true },
+          { name: 'فك الباند عن', value: `${unbannedCount}`, inline: true },
+          { name: 'رومات تم إنشاؤها', value: `${roomsCreated}`, inline: true },
+          { name: 'أعضاء استعيدت رتبهم', value: `${rolesRestored}`, inline: true },
+          { name: 'أعضاء عُدل اسمهم', value: `${nicknamesRestored}`, inline: true }
         )
-        .setDescription(detailsList.slice(0, 15).join('\n') + (detailsList.length > 15 ? `\n*و ${detailsList.length - 15} آخرين...*` : ''))
+        .setDescription(detailsList.length > 0 
+          ? detailsList.slice(0, 15).join('\n') + (detailsList.length > 15 ? `\n*و ${detailsList.length - 15} آخرين تم تعديلهم...*` : '')
+          : '✅ جميع رومات ورتب الأعضاء سليمة ومطابقة لقاعدة البيانات!'
+        )
         .setTimestamp();
 
-      await interaction.editReply({ content: '✅ تمت العملية بنجاح.', embeds: [resultEmbed] });
+      await interaction.editReply({ content: '✅ تمت صيانة واستعادة البيانات بنجاح.', embeds: [resultEmbed] });
 
     } catch (error) {
       console.error('Error in restore family command:', error);
-      await interaction.editReply('❌ حدث خطأ أثناء تنفيذ أمر الاستعادة.');
+      await interaction.editReply('❌ حدث خطأ أثناء تنفيذ أمر الاستعادة والصيانة.');
     }
   }
 };

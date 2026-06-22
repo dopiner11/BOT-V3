@@ -13,8 +13,26 @@ const STREAM_CACHE_TTL = 10 * 60 * 1000;
 const searchMemCache = new Map();
 const streamCache = new Map();
 const pendingSearches = new Map();
-const COOKIES_FILE = resolve(__dirname, '../youtube_cookies.txt');
-const hasCookies = existsSync(COOKIES_FILE);
+const MAIN_COOKIES_FILE = resolve(__dirname, '../youtube_cookies.txt');
+const WEB_COOKIES_FILE = resolve(__dirname, '../youtube_web_cookies.txt');
+let hasWebCookies = false;
+
+function ensureWebCookies() {
+  if (!existsSync(MAIN_COOKIES_FILE)) { hasWebCookies = false; return; }
+  try {
+    const content = readFileSync(MAIN_COOKIES_FILE, 'utf8');
+    const filtered = content.split('\n').filter(line => {
+      const t = line.trim();
+      return !t || t.startsWith('#') || !t.includes('LOGIN_INFO');
+    }).join('\n');
+    if (existsSync(WEB_COOKIES_FILE) && readFileSync(WEB_COOKIES_FILE, 'utf8') === filtered) {
+      hasWebCookies = true;
+      return;
+    }
+    writeFileSync(WEB_COOKIES_FILE, filtered, 'utf8');
+    hasWebCookies = true;
+  } catch {}
+}
 
 function ensureDir() {
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
@@ -27,16 +45,15 @@ function baseOpts(extra = {}) {
     noWarnings: true,
     retries: 2,
     extractorArgs: 'youtube:player_client=tv_embedded',
+    impersonate: 'chrome',
+    jsRuntimes: 'node',
     ...extra,
   };
+  if (hasWebCookies) opts.cookies = WEB_COOKIES_FILE;
   return opts;
 }
 
-function searchOpts(extra = {}) {
-  const opts = baseOpts(extra);
-  if (hasCookies) opts.cookies = COOKIES_FILE;
-  return opts;
-}
+ensureWebCookies();
 
 function loadSearchCache() {
   try {
@@ -70,7 +87,7 @@ export async function search(query) {
 
   const promise = (async () => {
     const searchQuery = `ytsearch1:${query}`;
-    const result = await youtubedl(searchQuery, searchOpts({ flatPlaylist: true }));
+    const result = await youtubedl(searchQuery, baseOpts({ flatPlaylist: true }));
 
     if (!result || !result.entries || !result.entries.length) {
       throw new Error(`No results for: ${query}`);

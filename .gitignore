@@ -29,6 +29,9 @@ data/
 cookies.txt
 user_cookies.txt
 
+# Auto-generated web cookies (filtered from youtube_cookies.txt)
+youtube_web_cookies.txt
+
 # Downloaded temp files
 *.part
 *.webm

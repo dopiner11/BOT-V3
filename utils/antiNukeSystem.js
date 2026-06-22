@@ -336,13 +336,13 @@ export async function handleWebhookCreate(webhook) {
 export async function handleGuildMemberAdd(member) {
   const guild = member.guild;
   if (!member.user.bot) return;
+  const config = loadConfig();
   const executor = await getBotAddExecutor(guild);
   if (!executor) return;
-  const config = loadConfig();
   const modMember = guild.members.cache.get(executor.id);
-  if (modMember && !isExempt(modMember, config)) {
-    await instantBan(modMember, guild, 'إضافة بوت - Anti Nuke');
-  }
+  if (!modMember) return;
+  if (isExempt(modMember, config)) return;
+  await instantBan(modMember, guild, 'إضافة بوت - Anti Nuke');
   await instantBan(member, guild, 'دخول بوت غير مصرح به - Anti Nuke');
 }
 

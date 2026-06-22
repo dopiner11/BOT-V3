@@ -26,9 +26,13 @@ function baseOpts(extra = {}) {
     noCheckCertificates: true,
     noWarnings: true,
     retries: 2,
-    extractorArgs: 'youtube:player_client=android,mweb',
     ...extra,
   };
+  return opts;
+}
+
+function searchOpts(extra = {}) {
+  const opts = baseOpts(extra);
   if (hasCookies) opts.cookies = COOKIES_FILE;
   return opts;
 }
@@ -65,7 +69,7 @@ export async function search(query) {
 
   const promise = (async () => {
     const searchQuery = `ytsearch1:${query}`;
-    const result = await youtubedl(searchQuery, baseOpts({ flatPlaylist: true }));
+    const result = await youtubedl(searchQuery, searchOpts({ flatPlaylist: true }));
 
     if (!result || !result.entries || !result.entries.length) {
       throw new Error(`No results for: ${query}`);
@@ -97,7 +101,7 @@ export async function getStream(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'bestaudio/best' }));
+  const info = await youtubedl(url, baseOpts({ format: 'bestaudio' }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 
@@ -122,7 +126,7 @@ export async function getStream(videoId) {
 
 export async function getStreamInfo(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'bestaudio/best' }));
+  const info = await youtubedl(url, baseOpts({ format: 'bestaudio' }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 

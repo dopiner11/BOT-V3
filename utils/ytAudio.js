@@ -1,82 +1,91 @@
 import { createRequire } from 'module';
+import { existsSync } from 'fs';
 const require = createRequire(import.meta.url);
 const youtubedl = require('youtube-dl-exec');
 
-function baseOpts(extra) {
-  return {
-    noCheckCertificates: true,
-    noWarnings: true,
-    retries: 3,
-    fragmentRetries: 3,
-    jsRuntimes: `node:${process.execPath}`,
-    addHeader: [
-      'referer:youtube.com',
-      'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    ],
-    ...extra,
-  };
+const TIMEOUT = 30000;
+const BASE = {
+  noCheckCertificates: true,
+  noWarnings: true,
+  retries: 1,
+  fragmentRetries: 1,
+  addHeader: [
+    'referer:youtube.com',
+    'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  ],
+};
+
+function makeOpts(extra) {
+  return { ...BASE, ...extra };
 }
 
-async function tryFetch(url, opts) {
+async function tryFetch(url, flags) {
   try {
-    return await youtubedl(url, opts);
+    return await youtubedl(url, flags, { timeout: TIMEOUT });
   } catch {
     return null;
   }
 }
 
-export async function getStream(videoId, cookiesPath) {
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
+const streamCache = new Map();
+const searchCache = new Map();
 
-  const candidates = [];
+export async function search(query, cookiesPath) {
+  const cached = searchCache.get(query);
+  if (cached) return cached;
 
-  // 1. cookies + web client (best, works on server)
-  if (cookiesPath) {
-    candidates.push(baseOpts({ dumpSingleJson: true, format: 'bestaudio/best', cookies: cookiesPath }));
+  const searchUrl = `ytsearch1:${query}`;
+  let result = null;
+
+  if (cookiesPath && existsSync(cookiesPath)) {
+    result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true, cookies: cookiesPath }));
+  }
+  if (!result) {
+    result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true }));
+  }
+  if (!result) {
+    result = await tryFetch(searchUrl, makeOpts({ dumpSingleJson: true, flatPlaylist: true, extractorArgs: 'youtube:player_client=android' }));
   }
 
-  // 2. iOS client (bypasses "Sign in" when no auth)
-  candidates.push(baseOpts({ dumpSingleJson: true, format: 'bestaudio/best', extractorArgs: 'youtube:player_client=ios' }));
+  if (!result?.entries?.[0]) throw new Error(`No YouTube results for: ${query}`);
 
-  // 3. web client (no auth, works locally)
-  candidates.push(baseOpts({ dumpSingleJson: true, format: 'bestaudio/best' }));
-
-  // 4. android client (last resort)
-  candidates.push(baseOpts({ dumpSingleJson: true, format: 'bestaudio/best', extractorArgs: 'youtube:player_client=android', cookies: cookiesPath || undefined }));
-
-  for (const opts of candidates) {
-    const info = await tryFetch(url, opts);
-    if (info?.url) {
-      return {
-        url: info.url,
-        type: info.acodec && info.acodec.includes('opus') ? 'opus' : 'arbitrary',
-        duration: info.duration || 0,
-        bitrate: info.abr || info.tbr || 0,
-        httpHeaders: info.http_headers || {},
-      };
-    }
-  }
-
-  throw new Error(`Could not resolve YouTube video: ${videoId}`);
+  const entry = result.entries[0];
+  const info = { videoId: entry.id, title: entry.title || query, duration: entry.duration || 0 };
+  searchCache.set(query, info);
+  return info;
 }
 
-export async function getPlaylistVideoIds(playlistUrl, cookiesPath) {
-  const candidates = [];
+export async function getStream(videoId, cookiesPath) {
+  const cached = streamCache.get(videoId);
+  if (cached) return cached;
 
-  if (cookiesPath) {
-    candidates.push(baseOpts({ dumpSingleJson: true, flatPlaylist: true, cookies: cookiesPath }));
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  let result = null;
+
+  if (cookiesPath && existsSync(cookiesPath)) {
+    result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best', cookies: cookiesPath }));
   }
-  candidates.push(baseOpts({ dumpSingleJson: true, flatPlaylist: true }));
-  candidates.push(baseOpts({ dumpSingleJson: true, flatPlaylist: true, extractorArgs: 'youtube:player_client=ios' }));
-
-  for (const opts of candidates) {
-    const info = await tryFetch(playlistUrl, opts);
-    if (info?.entries?.length) {
-      return info.entries.filter(e => e?.id).map(e => e.id);
-    }
+  if (!result) {
+    result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best' }));
+  }
+  if (!result) {
+    result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best', extractorArgs: 'youtube:player_client=android' }));
+  }
+  if (!result) {
+    result = await tryFetch(url, makeOpts({ dumpSingleJson: true, format: 'bestaudio/best', extractorArgs: 'youtube:player_client=ios' }));
   }
 
-  throw new Error('No entries in playlist');
+  if (!result?.url) throw new Error(`Could not resolve YouTube video: ${videoId}`);
+
+  const info = {
+    url: result.url,
+    type: result.acodec && result.acodec.includes('opus') ? 'opus' : 'arbitrary',
+    duration: result.duration || 0,
+    bitrate: result.abr || result.tbr || 0,
+    httpHeaders: result.http_headers || {},
+  };
+  streamCache.set(videoId, info);
+  return info;
 }
 
 export function extractVideoId(url) {

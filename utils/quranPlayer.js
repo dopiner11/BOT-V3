@@ -6,7 +6,7 @@ import { Readable } from 'stream';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { gold as embedGold } from './embedStyles.js';
-import { getStream as ytGetStream, getPlaylistVideoIds, extractVideoId } from './ytAudio.js';
+import { getStream as ytGetStream, search as ytSearch, extractVideoId } from './ytAudio.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -126,8 +126,6 @@ const SURAHS = [
   { id: 113, name: 'الفلق', ayahCount: 5 },
   { id: 114, name: 'الناس', ayahCount: 6 },
 ];
-const playlistVideosCache = new Map();
-
 function getReciters() {
   const config = loadConfig();
   const reciters = {};
@@ -140,8 +138,7 @@ function getReciters() {
       if (r.id) {
         reciters[r.id] = {
           name: r.name,
-          baseUrl: r.baseUrl || null,
-          youtubePlaylistId: r.youtubePlaylistId || null
+          baseUrl: r.baseUrl || null
         };
       }
     }
@@ -569,21 +566,6 @@ class QuranPlayer {
     }
   }
 
-  async playPlaylistSurah(reciter, surah) {
-    const playlistUrl = reciter.youtubePlaylistId;
-    let videoIds = playlistVideosCache.get(playlistUrl);
-    if (!videoIds) {
-      videoIds = await getPlaylistVideoIds(playlistUrl, getCookiesPath());
-      playlistVideosCache.set(playlistUrl, videoIds);
-    }
-    const index = surah.id - 1;
-    if (index >= videoIds.length) {
-      console.warn('[QuranPlayer] Surah index out of playlist range');
-      return;
-    }
-    await this.playUrl('https://www.youtube.com/watch?v=' + videoIds[index]);
-  }
-
   async playCurrent() {
     if (this.queue.length === 0 || this.queueIndex >= this.queue.length) {
       if (this.contentType === 'quran') {
@@ -605,17 +587,25 @@ class QuranPlayer {
       if (reciter.baseUrl) {
         const url = reciter.baseUrl + '/' + String(surahId).padStart(3, '0') + '.mp3';
         await this.playUrl(url);
-      } else if (reciter.youtubePlaylistId) {
-        await this.playPlaylistSurah(reciter, surah);
+      } else {
+        const q = `${reciter.name} سورة ${surah.name} كاملة`;
+        const r = await ytSearch(q, getCookiesPath());
+        await this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
       }
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       const item = items.find(it => it.name === this.currentItem);
       if (!item) return;
       const reciterCfg = item.reciters.find(r => r.id === this.reciterId);
-      if (!reciterCfg?.url) return;
+      if (!reciterCfg) return;
       this.currentSurah = null;
-      await this.playUrl(reciterCfg.url);
+      if (reciterCfg.url) {
+        await this.playUrl(reciterCfg.url);
+      } else {
+        const q = `${reciterCfg.name} ${item.name}`;
+        const r = await ytSearch(q, getCookiesPath());
+        await this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
+      }
     }
   }
 
@@ -630,8 +620,10 @@ class QuranPlayer {
       if (!reciter) return;
       if (reciter.baseUrl) {
         this.playUrl(reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3');
-      } else if (reciter.youtubePlaylistId) {
-        this.playPlaylistSurah(reciter, randomSurah);
+      } else {
+        const q = `${reciter.name} سورة ${randomSurah.name} كاملة`;
+        const r = await ytSearch(q, getCookiesPath());
+        this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
       }
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
@@ -640,11 +632,17 @@ class QuranPlayer {
       this.currentItem = randomItem.name;
       this.currentSurah = null;
       const rc = randomItem.reciters.find(r => r.id === this.reciterId) || randomItem.reciters[0];
-      if (!rc?.url) return;
+      if (!rc) return;
       this.reciterId = rc.id;
       this.queue = [randomItem.id];
       this.queueIndex = 0;
-      this.playUrl(rc.url);
+      if (rc.url) {
+        this.playUrl(rc.url);
+      } else {
+        const q = `${rc.name} ${randomItem.name}`;
+        const r = await ytSearch(q, getCookiesPath());
+        this.playUrl(`https://www.youtube.com/watch?v=${r.videoId}`);
+      }
     }
   }
 

@@ -13,6 +13,7 @@
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
     "@discordjs/voice": "^0.19.2",
+    "opusscript": "^0.0.8",
     "axios": "^1.13.4",
     "clsx": "^2.1.1",
     "convex": "^1.24.2",

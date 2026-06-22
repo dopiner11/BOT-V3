@@ -26,6 +26,7 @@ function baseOpts(extra = {}) {
     noCheckCertificates: true,
     noWarnings: true,
     retries: 2,
+    extractorArgs: 'youtube:player_client=tv_embedded',
     ...extra,
   };
   return opts;

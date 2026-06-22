@@ -1002,5 +1002,23 @@
         ]
       }
     ]
+  },
+  "antiNuke": {
+    "_label": "🛡️ نظام الحماية المتطور - Anti Nuke",
+    "enabled": true,
+    "logChannelId": "1511759665615339720",
+    "bypassRoleIds": [],
+    "roleEditThreshold": 3,
+    "roleCreateThreshold": 3,
+    "channelCreateThreshold": 3,
+    "channelUpdateThreshold": 5,
+    "banThreshold": 3,
+    "kickThreshold": 3,
+    "timeoutThreshold": 5,
+    "messageDeleteThreshold": 10,
+    "mentionThreshold": 5,
+    "spamThreshold": 5,
+    "emojiCreateThreshold": 3,
+    "emojiUpdateThreshold": 3
   }
 }

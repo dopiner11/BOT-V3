@@ -366,6 +366,13 @@ export const commandRegistry = {
     description: '🎛️ لوحة تحكم التحديات اليومية',
     usage: '/تحديات',
   },
+  'فك_الباند_الجماعي': {
+    category: 'punishments',
+    committee: 'punishment',
+    action: 'unbanAll',
+    description: 'فك الباند عن جميع الأعضاء الممنوعين من السيرفر',
+    usage: '/فك_الباند_الجماعي',
+  },
 };
 
 /**

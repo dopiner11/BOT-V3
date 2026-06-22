@@ -17,6 +17,8 @@ const MAIN_COOKIES_FILE = resolve(__dirname, '../youtube_cookies.txt');
 const WEB_COOKIES_FILE = resolve(__dirname, '../youtube_web_cookies.txt');
 let hasWebCookies = false;
 
+const FORMAT_CHAIN = 'bestaudio[acodec=opus]/bestaudio[acodec=aac]/bestaudio/best';
+
 function ensureWebCookies() {
   if (!existsSync(MAIN_COOKIES_FILE)) { hasWebCookies = false; return; }
   try {
@@ -25,13 +27,9 @@ function ensureWebCookies() {
       const t = line.trim();
       return !t || t.startsWith('#') || !t.includes('LOGIN_INFO');
     }).join('\n');
-    if (existsSync(WEB_COOKIES_FILE) && readFileSync(WEB_COOKIES_FILE, 'utf8') === filtered) {
-      hasWebCookies = true;
-      return;
-    }
     writeFileSync(WEB_COOKIES_FILE, filtered, 'utf8');
     hasWebCookies = true;
-  } catch {}
+  } catch { hasWebCookies = false; }
 }
 
 function ensureDir() {
@@ -44,7 +42,7 @@ function baseOpts(extra = {}) {
     noCheckCertificates: true,
     noWarnings: true,
     retries: 2,
-    extractorArgs: 'youtube:player_client=tv_embedded',
+    extractorArgs: 'youtube:player_client=web,android,mweb,tv_embedded,ios',
     ...extra,
   };
   if (hasWebCookies) opts.cookies = WEB_COOKIES_FILE;
@@ -117,7 +115,7 @@ export async function getStream(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'bestaudio' }));
+  const info = await youtubedl(url, baseOpts({ format: FORMAT_CHAIN }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 
@@ -142,7 +140,7 @@ export async function getStream(videoId) {
 
 export async function getStreamInfo(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'bestaudio' }));
+  const info = await youtubedl(url, baseOpts({ format: FORMAT_CHAIN }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 

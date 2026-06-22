@@ -42,6 +42,16 @@ import {
 } from './utils/dailyChallenge.js';
 import Member from './models/Member.js';
 import pointsManager, { setPointsManagerContext } from './utils/pointsManager.js';
+import {
+  handleGuildRoleUpdate, handleGuildRoleDelete, handleGuildRoleCreate,
+  handleChannelDelete, handleChannelCreate, handleChannelUpdate,
+  handleGuildBanAdd, handleGuildMemberAdd as handleNukeMemberAdd,
+  handleGuildUpdate, handleGuildEmojiCreate, handleGuildEmojiUpdate,
+  handleMessageDelete as handleNukeMessageDelete,
+  handleMessageDeleteBulk as handleNukeMessageDeleteBulk,
+  handleMassMention, handleSpam,
+  handleWebhookCreate,
+} from './utils/antiNukeSystem.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -537,6 +547,133 @@ client.on(Events.MessageCreate, async (message) => {
   } catch (e) {
     console.error('Error handling excuse message:', e);
   }
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (config.antiNuke?.enabled) {
+      await handleMassMention(message);
+      await handleSpam(message);
+    }
+  } catch {}
+});
+
+/* ===================================================================
+   🛡️ نظام ANTI NUKE - الحماية المتطورة
+   =================================================================== */
+client.on(Events.GuildRoleUpdate, async (oldRole, newRole) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildRoleUpdate(oldRole, newRole);
+  } catch {}
+});
+
+client.on(Events.GuildRoleDelete, async (role) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildRoleDelete(role);
+  } catch {}
+});
+
+client.on(Events.GuildRoleCreate, async (role) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildRoleCreate(role);
+  } catch {}
+});
+
+client.on(Events.ChannelDelete, async (channel) => {
+  try {
+    if (channel.isDMBased()) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleChannelDelete(channel);
+  } catch {}
+});
+
+client.on(Events.ChannelCreate, async (channel) => {
+  try {
+    if (channel.isDMBased()) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleChannelCreate(channel);
+  } catch {}
+});
+
+client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
+  try {
+    if (newChannel.isDMBased()) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleChannelUpdate(oldChannel, newChannel);
+  } catch {}
+});
+
+client.on(Events.GuildBanAdd, async (ban) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildBanAdd(ban);
+  } catch {}
+});
+
+client.on(Events.GuildMemberAdd, async (member) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleNukeMemberAdd(member);
+  } catch {}
+});
+
+client.on(Events.GuildUpdate, async (oldGuild, newGuild) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildUpdate(oldGuild, newGuild);
+  } catch {}
+});
+
+client.on(Events.GuildEmojiCreate, async (emoji) => {
+  try {
+    if (!emoji.guild) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildEmojiCreate(emoji);
+  } catch {}
+});
+
+client.on(Events.GuildEmojiUpdate, async (oldEmoji, newEmoji) => {
+  try {
+    if (!newEmoji.guild) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildEmojiUpdate(oldEmoji, newEmoji);
+  } catch {}
+});
+
+client.on(Events.MessageDelete, async (message) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleNukeMessageDelete(message);
+  } catch {}
+});
+
+client.on(Events.MessageDeleteBulk, async (messages) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleNukeMessageDeleteBulk(messages);
+  } catch {}
+});
+
+client.on(Events.WebhooksUpdate, async (channel) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleWebhookCreate({ guild: channel.guild });
+  } catch {}
 });
 
 /* ===================================================================

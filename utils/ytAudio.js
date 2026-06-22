@@ -10,10 +10,8 @@ let YouTube;
 let ytdl;
 try {
   process.chdir(resolve(__dirname, '../MusicBot-main'));
-
   process.env.COOKIES_FROM_BROWSER = '';
   process.env.COOKIES_FILE = resolve(__dirname, '../MusicBot-main/cookies.txt');
-
   YouTube = require(resolve(__dirname, '../MusicBot-main/src/YouTube.js'));
   ytdl = require('youtube-dl-exec');
 } finally {
@@ -23,11 +21,18 @@ try {
 const streamCache = new Map();
 const searchCache = new Map();
 
+function timeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 export async function search(query) {
   const cached = searchCache.get(query);
   if (cached) return cached;
 
-  const results = await YouTube.search(query, 1);
+  const results = await timeout(YouTube.search(query, 1), 30000);
   if (!results?.length) throw new Error(`No YouTube results for: ${query}`);
 
   const track = results[0];
@@ -41,13 +46,26 @@ export async function getStream(videoId) {
   if (cached) return cached;
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const formats = ['bestaudio*', 'bestaudio/best', 'worstaudio', 'best'];
 
+  try {
+    const result = await timeout(YouTube.getStream(url), 30000);
+    const info = {
+      url: result.url,
+      type: result.type,
+      duration: result.duration || 0,
+      bitrate: result.bitrate || 0,
+      httpHeaders: result.httpHeaders || {},
+    };
+    streamCache.set(videoId, info);
+    return info;
+  } catch {}
+
+  const formats = ['bestaudio*', 'bestaudio/best', 'best'];
   let lastError;
   for (const format of formats) {
     try {
-      const opts = YouTube.getYtDlpOptions({ dumpSingleJson: true, format });
-      const result = await ytdl(url, opts, { timeout: 30000 });
+      const opts = YouTube.getYtDlpOptions({ dumpSingleJson: true, format, preferFreeFormats: true });
+      const result = await timeout(ytdl(url, opts, { timeout: 30000 }), 35000);
       if (result?.url) {
         const info = {
           url: result.url,

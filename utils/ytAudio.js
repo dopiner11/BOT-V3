@@ -63,9 +63,7 @@ export async function getStream(videoId) {
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   const info = await timeout(ytdl.getInfo(url), 30000);
-  const audio = ytdl.filterFormats(info.formats, 'audioonly');
-  if (!audio.length) throw new Error('No audio formats found');
-  const format = ytdl.chooseFormat(audio, { quality: 'highest' });
+  const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
   const stream = ytdl.downloadFromInfo(info, { format });
   streamMem.set(videoId, stream);
   return stream;

@@ -695,7 +695,7 @@ class QuranPlayer {
     savePlayerState(this);
   }
 
-  setSurah(surahId) {
+  async setSurah(surahId) {
     const id = parseInt(surahId);
     const surah = SURAHS.find(s => s.id === id);
     if (!surah) return;
@@ -703,10 +703,13 @@ class QuranPlayer {
     this.currentItem = null;
     this.queue = SURAHS.slice(id - 1).map(s => s.id);
     this.queueIndex = 0;
-    this.playCurrent();
+    try { await this.playCurrent(); } catch (e) {
+      console.warn('[QuranPlayer] playCurrent failed:', e.message);
+      if (this.message) this.message.edit({ embeds: [this.buildEmbed().setFooter({ text: '❌ فشل التشغيل' })] }).catch(() => {});
+    }
   }
 
-  setItem(itemId) {
+  async setItem(itemId) {
     const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
     const item = items.find(it => it.id === itemId);
     if (!item) return;
@@ -717,7 +720,10 @@ class QuranPlayer {
     if (item.reciters.length > 0) {
       this.reciterId = item.reciters[0].id;
     }
-    this.playCurrent();
+    try { await this.playCurrent(); } catch (e) {
+      console.warn('[QuranPlayer] playCurrent failed:', e.message);
+      if (this.message) this.message.edit({ embeds: [this.buildEmbed().setFooter({ text: '❌ فشل التشغيل' })] }).catch(() => {});
+    }
   }
 
   async setReciter(reciterId) {
@@ -843,74 +849,87 @@ export async function handleQuranInteraction(interaction) {
     if (customId === 'qp_content_type' && interaction.isStringSelectMenu()) {
       const type = interaction.values[0];
       player.setContentType(type);
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_item' && interaction.isStringSelectMenu()) {
       const value = interaction.values[0];
       if (value === 'none') return interaction.deferUpdate();
+      await interaction.deferUpdate();
       if (player.contentType === 'quran') {
-        player.setSurah(value);
+        await player.setSurah(value);
       } else {
-        player.setItem(value);
+        await player.setItem(value);
       }
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_reciter' && interaction.isStringSelectMenu()) {
       const reciterId = interaction.values[0];
+      await interaction.deferUpdate();
       await player.setReciter(reciterId);
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_playpause') {
       player.togglePlayPause();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_stop') {
       player.stop();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_next') {
       player.next();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_prev') {
       player.prev();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_repeat') {
       player.toggleRepeat();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_autoplay') {
       player.toggleAutoPlay();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_vol_down') {
       player.adjustVolume(-VOLUME_STEP);
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_vol_up') {
       player.adjustVolume(VOLUME_STEP);
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_page_prev') {
       player.prevPage();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
 
     if (customId === 'qp_page_next') {
       player.nextPage();
-      return interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      await interaction.update({ embeds: [player.buildEmbed()], components: await player.buildComponents() });
+      return;
     }
   } catch (err) {
     if (err.code === 10008) {

@@ -322,7 +322,7 @@ async function getAudioStream(videoId) {
     const stream = await getStream(videoId);
     if (stream) return stream;
   } catch (err) {
-    errors.push('dl-yt-dlp: ' + (err.message || '').slice(0, 80));
+    errors.push('dl-yt-dlp: ' + (err.message || '').slice(0, 120));
   }
 
   // ── Strategy 2: yt-dlp via any available method ─────────────────

@@ -722,7 +722,7 @@ class QuranPlayer {
   async setReciter(reciterId) {
     this.reciterId = reciterId;
     if (this.queue.length > 0) {
-      this.playCurrent();
+      await this.playCurrent();
     }
   }
 

@@ -9,19 +9,19 @@ const require = createRequire(import.meta.url);
 const origCwd = process.cwd();
 
 let YouTube;
-let ytdl;
 try {
   process.chdir(resolve(__dirname, '../MusicBot-main'));
   process.env.COOKIES_FROM_BROWSER = '';
   process.env.COOKIES_FILE = resolve(__dirname, '../MusicBot-main/cookies.txt');
   YouTube = require(resolve(__dirname, '../MusicBot-main/src/YouTube.js'));
-  ytdl = require('@distube/ytdl-core');
 } finally {
   process.chdir(origCwd);
 }
 
 const CACHE_DIR = resolve(__dirname, '../.cache');
 const SEARCH_FILE = resolve(CACHE_DIR, 'ytSearch.json');
+const STREAM_FILE = resolve(CACHE_DIR, 'ytStream.json');
+const STREAM_TTL = 4 * 60 * 60 * 1000;
 const streamMem = new Map();
 
 function ensureDir() {
@@ -62,11 +62,14 @@ export async function getStream(videoId) {
   if (streamMem.has(videoId)) return streamMem.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await timeout(ytdl.getInfo(url), 30000);
-  const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
-  const stream = ytdl.downloadFromInfo(info, { format });
-  streamMem.set(videoId, stream);
-  return stream;
+  const streamInfo = await timeout(YouTube.getStream(url), 65000);
+  const response = await timeout(fetch(streamInfo.url, { headers: streamInfo.httpHeaders }), 30000);
+  if (!response.ok || !response.body) {
+    throw new Error(`Stream fetch failed: ${response.status}`);
+  }
+  const nodeStream = Readable.fromWeb(response.body);
+  streamMem.set(videoId, nodeStream);
+  return nodeStream;
 }
 
 export function extractVideoId(url) {

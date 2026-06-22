@@ -148,7 +148,6 @@
 .freevpnplanet.com	TRUE	/	FALSE	1794625638	__zlcmid	1XboW9qoy8tYboj
 .freevpnplanet.com	TRUE	/	FALSE	1791468998	show_free_locations_modal	true
 .gemini.google.com	TRUE	/	TRUE	1782966469	COMPASS	gemini-pd=CjwACWuJV93jFYb_b6k1ZbZc5AVi75OXfwVJx6huPFdJgLZgT-iphNSBtyIyTho-2Gurv4U86El7hPmdVFUQwJbo0QYaaAAJa4lXpbr5GdLoMxiBIFP_RfgRWr7zDa_cTIcIhNBrnOGI-jaVb8bo49VOyRJfSHVQnrePybybWr92vrJze_fx5HeMr3nEWrNLDYTRSzxqOwppEYTiYhV_cxepqol6wbE76R76DMZ_IAEwAQ:gemini-hl=CkkACWuJV4Jq7gXnYGXm-CCWRGf1MNczIJ0yMsen8R98zb0fdd_v1HDcw_-Y0Gxw7WZu_GGVl89NUAGecp6EG6tM_DjudIlkdiK-EMOW6NEGGnUACWuJV524XxkelgZ8jk2I-hXfUuDGgC8g9KkTGKeTwcIAhi6N4o2pT1QV-58MRAemP3gAKpciQvYrtyVwFgCqzeVB0Is7LyP9bOptKiw8okeXEuNdbxuyE2fNeXynTj5jjTQBPjkac0t9KfDlvIzf1YD5Pt0gATAB
-.genius.com	TRUE	/	TRUE	1782107435	__cf_bm	ONPsRwJG20UYkfuVq275Bk2IkUIdMMI9oTOTx5KO1Q8-1782105635.2329435-1.0.1.1-6Yvr0VhQI2zb2_cPIUoFE.GcrF9fjMgAhcriUo0IxB20bd0zJh8qJwy7_epkfJDkiQ5OjalvBi2cCJ_wexSfjpAQar8Z2LXcWEhBKmWV9AzJ_0uA3a9HvorW52DVCoAt
 .genius.com	TRUE	/	TRUE	0	_cfuvid	Sb9ZHpPouYjf2M9K8fW8BDBC6evBYNHHxIWza34Y_gI-1782105635.2329435-1.0.1.1-hADZ986Xlca1ljWeaBLUdvBnPmWmXIhCHXiBXgJsc1k
 .genius.com	TRUE	/	TRUE	1797657713	_csrf_token	HLACkn8xw%2FwTDq05oP4rTdcqvCFNPHnKajkjl2uCHAo%3D
 .genius.com	TRUE	/	TRUE	0	_rapgenius_session	BAh7CUkiD3Nlc3Npb25faWQGOgZFVEkiJTYyODQ1ZTJlOTIzZGRkNmJiY2RlMmI4MDRmNzljZTNkBjsAVEkiEF9jc3JmX3Rva2VuBjsARkkiMUhMQUNrbjh4dy93VERxMDVvUDRyVGRjcXZDRk5QSG5LYWpramwydUNIQW89BjsARkkiFXVzZXJfY3JlZGVudGlhbHMGOwBUSSIBgDc4MmVmOGQyYTFhMzFiYzdmZWZlNzhhOTc3NWNlZGMzYWY1YWVmODBkODY5MzY3YWQwYWM0MTUzN2ZmNTQxNDUxNDgyZTVkNmM1YTU4MTg5MzFiNGUwMGM0M2EyMmUxMDg0MDllMzE2MmNmOTIwMThiMDAwM2EzOGZiNWZiMzAwBjsAVEkiGHVzZXJfY3JlZGVudGlhbHNfaWQGOwBUaQTBL3EB--c28b26f3ee4fc63d32353dcd7f51c3e97c2a493d
@@ -344,18 +343,18 @@
 .youtube.com	TRUE	/	FALSE	0	PREF	f6=40000000&tz=UTC&f7=100&hl=en
 .youtube.com	TRUE	/	TRUE	1797654396	SAPISID	ybzzhN2h6ACMLZXB/A3306xwsMNvFES6j1
 .youtube.com	TRUE	/	FALSE	1797654396	SID	g.a000_QhRN-BMBinB-YCkWeEO9KY8rF_sfDeEbKUHjJSTCwT0vDvuSybba_sb8COmEC_Ag_eYhwACgYKATESARISFQHGX2MioM2HX1xU5C5f4v_35g9y5BoVAUF8yKpfr6jnOVur_bImQmaIefoa0076
-.youtube.com	TRUE	/	FALSE	1813642825	SIDCC	AKEyXzUCpEAAcRvef2eNxAAvnGdzu622x4mL0F8Okxe6xetLzUPPI9SyK6RHmA4pSgMhD3YaIw
+.youtube.com	TRUE	/	FALSE	1813646533	SIDCC	AKEyXzXtWWXFtxWQyz3g51SiIOd3NEDJv_W3rYFqj4OP9lSA9BXW-8E4vISlpxvOKo02D0PrHg
 .youtube.com	TRUE	/	TRUE	1797654396	SSID	AY1NycSMoIdM-7FFM
-.youtube.com	TRUE	/	TRUE	1797658825	VISITOR_INFO1_LIVE	9-F1uX5hXbk
-.youtube.com	TRUE	/	TRUE	1797658825	VISITOR_PRIVACY_METADATA	CgJJURIEGgAgag%3D%3D
+.youtube.com	TRUE	/	TRUE	1797662533	VISITOR_INFO1_LIVE	9-F1uX5hXbk
+.youtube.com	TRUE	/	TRUE	1797662533	VISITOR_PRIVACY_METADATA	CgJJURIEGgAgag%3D%3D
 .youtube.com	TRUE	/	TRUE	0	YSC	z_qcvLca1XM
 .youtube.com	TRUE	/	TRUE	1797654396	__Secure-1PAPISID	ybzzhN2h6ACMLZXB/A3306xwsMNvFES6j1
 .youtube.com	TRUE	/	TRUE	1797654396	__Secure-1PSID	g.a000_QhRN-BMBinB-YCkWeEO9KY8rF_sfDeEbKUHjJSTCwT0vDvuwCQyxW2QT586qW9yJXnXbgACgYKARESARISFQHGX2Mi27Z-cQyXFlNc0SvzH5WwTBoVAUF8yKoKANFBDsbxRTbq_5dDEwFZ0076
-.youtube.com	TRUE	/	TRUE	1813642825	__Secure-1PSIDCC	AKEyXzVhVwxaJLbLjgTJVXW52cXZdj9gtihURmunUTBcN7BLCFTMwO-Ch_HdXQ3rXhZI_iVPk88
+.youtube.com	TRUE	/	TRUE	1813646533	__Secure-1PSIDCC	AKEyXzW7mUs4EMxVUtr7wEtS2njorH0Nv8rYQ02JsPnd_lDVolqbxsBfHMFdLz5un-dvlkbZeFw
 .youtube.com	TRUE	/	TRUE	1797657851	__Secure-1PSIDTS	sidts-CjUByojQU6wShf8XZhIvBtco6creszzjmrV6KUbzZkFUZ0Gp1tItw66GOjuraLvUfWbzH_XDLRAA
 .youtube.com	TRUE	/	TRUE	1797654396	__Secure-3PAPISID	ybzzhN2h6ACMLZXB/A3306xwsMNvFES6j1
 .youtube.com	TRUE	/	TRUE	1797654396	__Secure-3PSID	g.a000_QhRN-BMBinB-YCkWeEO9KY8rF_sfDeEbKUHjJSTCwT0vDvu9_3OIoNRUIyhE5bcV30tqAACgYKAckSARISFQHGX2MiNoRxzXL7NcOrP_JueVZzOxoVAUF8yKp_065Zf4nJ4Z__9_LqYcBC0076
-.youtube.com	TRUE	/	TRUE	1813642825	__Secure-3PSIDCC	AKEyXzU86LcwMzLasRxyWQfUe_EmnXB4ede6qIpngzc0wH14eTwFExks-kYQ-TPKBnJt0XC2VA
+.youtube.com	TRUE	/	TRUE	1813646533	__Secure-3PSIDCC	AKEyXzXPixogxebfqEkaJALTYk-xVIFfXob__qpoVNoYrBbKxc8laxZvxLEhBXCdPvSCpPehoA
 .youtube.com	TRUE	/	TRUE	1797657851	__Secure-3PSIDTS	sidts-CjUByojQU6wShf8XZhIvBtco6creszzjmrV6KUbzZkFUZ0Gp1tItw66GOjuraLvUfWbzH_XDLRAA
 .youtube.com	TRUE	/	TRUE	1791459321	__Secure-BUCKET	CPEE
 .youtube.com	TRUE	/	TRUE	1797593032	__Secure-ROLLOUT_TOKEN	CKGQrqfKm-vnGBC1urXexdOTAxiB4L6UnJiVAw%3D%3D
@@ -383,7 +382,6 @@ accounts.google.com	FALSE	/	TRUE	1797654396	__Host-1PLSID	o.calendar.google.com|
 accounts.google.com	FALSE	/	TRUE	1797654396	__Host-3PLSID	o.calendar.google.com|o.chromewebstore.google.com|o.console.cloud.google.com|o.drive.google.com|o.drive.usercontent.google.com|o.lens.google.com|o.mail.google.com|o.play.google.com|s.IQ|s.youtube:g.a000_QhRN8mM8nVh4CFg2T6DKbrh0q8BKFGmhjVPm5E7PCqx0EsiR2Mkskek2ulHQ0VyfLtOEAACgYKAdUSARISFQHGX2MiXRtNWGzoo6HxbhyeDDQl3RoVAUF8yKqr1QKJ4KXPMeD4vQlAyUQt0076
 accounts.google.com	FALSE	/	TRUE	1797654382	__Host-GAPS	1:TDj_nkr_lPAXMUhzNalxQ9_QlazTlhg4j87s8eka__9WHQDRvwWP4OLe0M_xVVp-3aq3A6q3lkzmrO8OLfKLlAXwpKew8OmOik5GNRgMn3pNWptpUpOC1ILqHKRvp7pyZqJZtf0Dj_EOug:03TJnM91i3-NOGUQ
 accounts.spotify.com	FALSE	/	TRUE	1797657294	__Host-device_id	AQB4nZcegTffCR0_zkQg2KrvTpzByMhNmuIHhkinL6jNQJo-XdnJZlkPCzlt913_1wPbASW4yYJ3n2dxLviaV93pc30UGr_7tAA
-accounts.spotify.com	FALSE	/	TRUE	1782108930	__Host-sp_csrf_sid	d32e76e92995d377bb077d0957b97d625bf3b6d4f153f52d985c50531d2abd1d
 acrobat.adobe.com	FALSE	/	FALSE	1796122620	g_state	{"i_l":0,"i_ll":1780570609153,"i_e":{"enable_itp_optimization":0},"i_et":1780570359014}
 aiskillsnavigator.microsoft.com	FALSE	/	TRUE	1796630000	ai_user	rlij2HWVhSBGjvdcLk87Z9|2026-06-10T07:53:19.985Z
 aliabdaal.com	FALSE	/	TRUE	1791547642	_fk_contact_uid	ff1d90407bf0acd754d04f4d2d1ce903
@@ -437,7 +435,6 @@ cursor.com	FALSE	/	TRUE	1784134785	cursor_marketing_attribution_storage_allowed	
 cursor.com	FALSE	/	TRUE	1784134785	logoCountry	IQ
 cursor.com	FALSE	/	TRUE	1792500522	statsig_stable_id	38fd689d-208b-4581-8126-ec9de2347db7
 cursor.com	FALSE	/	TRUE	1786727225	workos_id	user_01KV63Z1KZXXEME575ANK0MDBR
-developer.spotify.com	FALSE	/	TRUE	1782109219	__Host-sp_csrf_sid	e67ac1489e15547a36b908ddd949152b27be05189bcf1d6e8e9abb3a1b4cf768
 developers.google.com	FALSE	/	FALSE	1792420208	cookies_accepted	true
 developers.google.com	FALSE	/	FALSE	1792420208	django_language	en
 discord.com	FALSE	/	TRUE	1790827232	__dcfduid	d30963e02fda11f1969f8d5e58f6e69c

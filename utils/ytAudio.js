@@ -96,7 +96,7 @@ export async function getStream(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'bestaudio[ext=webm]/bestaudio' }));
+  const info = await youtubedl(url, baseOpts({ format: 'ba[ext=webm]/ba[ext=m4a]/ba' }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 
@@ -121,7 +121,7 @@ export async function getStream(videoId) {
 
 export async function getStreamInfo(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'bestaudio[ext=webm]/bestaudio' }));
+  const info = await youtubedl(url, baseOpts({ format: 'ba[ext=webm]/ba[ext=m4a]/ba' }));
 
   if (!info || !info.url) throw new Error('No stream URL found');
 

@@ -20,21 +20,23 @@ try {
 }
 
 const CACHE_DIR = resolve(__dirname, '../.cache');
-const SEARCH_CACHE_FILE = resolve(CACHE_DIR, 'ytSearch.json');
-const streamCache = new Map();
+const SEARCH_FILE = resolve(CACHE_DIR, 'ytSearch.json');
+const STREAM_FILE = resolve(CACHE_DIR, 'ytStream.json');
+const STREAM_TTL = 4 * 60 * 60 * 1000;
 
-function loadCache() {
-  try {
-    if (existsSync(SEARCH_CACHE_FILE)) return JSON.parse(readFileSync(SEARCH_CACHE_FILE, 'utf8'));
-  } catch {}
+const memStream = new Map();
+
+function ensureDir() {
+  if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+function readJson(path) {
+  try { if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8')); } catch {}
   return {};
 }
 
-function saveCache(cache) {
-  try {
-    if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(SEARCH_CACHE_FILE, JSON.stringify(cache, null, 2));
-  } catch {}
+function writeJson(path, data) {
+  try { ensureDir(); writeFileSync(path, JSON.stringify(data, null, 2)); } catch {}
 }
 
 function timeout(promise, ms) {
@@ -45,7 +47,7 @@ function timeout(promise, ms) {
 }
 
 export async function search(query) {
-  const cache = loadCache();
+  const cache = readJson(SEARCH_FILE);
   if (cache[query]) return cache[query];
 
   const results = await timeout(YouTube.search(query, 1), 60000);
@@ -54,13 +56,19 @@ export async function search(query) {
   const track = results[0];
   const info = { videoId: track.id, title: track.title, duration: track.duration || 0 };
   cache[query] = info;
-  saveCache(cache);
+  writeJson(SEARCH_FILE, cache);
   return info;
 }
 
 export async function getStream(videoId) {
-  const cached = streamCache.get(videoId);
-  if (cached) return cached;
+  if (memStream.has(videoId)) return memStream.get(videoId);
+
+  const disk = readJson(STREAM_FILE);
+  const entry = disk[videoId];
+  if (entry && Date.now() - entry.cachedAt < STREAM_TTL) {
+    memStream.set(videoId, entry);
+    return entry;
+  }
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   const formats = ['bestaudio*', 'bestaudio/best', 'best'];
@@ -83,8 +91,11 @@ export async function getStream(videoId) {
           duration: result.duration || 0,
           bitrate: result.abr || result.tbr || 0,
           httpHeaders: result.http_headers || {},
+          cachedAt: Date.now(),
         };
-        streamCache.set(videoId, info);
+        memStream.set(videoId, info);
+        disk[videoId] = info;
+        writeJson(STREAM_FILE, disk);
         return info;
       }
     } catch (e) {

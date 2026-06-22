@@ -34,7 +34,7 @@ export default {
         const fetched = await interaction.guild.fetchAuditLogs({
           type: 23,
           limit: 100,
-          before: lastId,
+          before: lastId || undefined,
         });
 
         const entries = [...fetched.entries.values()];
@@ -42,7 +42,11 @@ export default {
 
         let timeExpired = false;
         for (const entry of entries) {
-          if (entry.createdTimestamp < since) { timeExpired = true; break; }
+          lastId = entry.id;
+          if (entry.createdTimestamp < since) {
+            timeExpired = true;
+            break;
+          }
           if (entry.action !== 23) continue;
           if (seen.has(entry.targetId)) continue;
           seen.add(entry.targetId);
@@ -50,7 +54,6 @@ export default {
             const user = await interaction.client.users.fetch(entry.targetId);
             unbannedUsers.push(user);
           } catch {}
-          lastId = entry.id;
         }
 
         if (timeExpired || entries.length < 100) hasMore = false;
@@ -91,7 +94,11 @@ export default {
         return interaction.editReply({ content: '✅ تم إلغاء العملية.', components: [], embeds: [] });
       }
 
-      await collected.deferUpdate();
+      try {
+        await collected.deferUpdate();
+      } catch (err) {
+        console.warn('⚠️ Warning: deferUpdate failed in rescue command:', err.message);
+      }
 
       await interaction.editReply({ content: `🔄 جاري إرسال الرسائل... (0/${unbannedUsers.length})`, components: [], embeds: [] });
 
@@ -101,34 +108,36 @@ export default {
         ? `discord.gg/${interaction.guild.vanityURL}`
         : null;
 
-      const batchSize = 10;
-      for (let i = 0; i < unbannedUsers.length; i += batchSize) {
-        const batch = unbannedUsers.slice(i, i + batchSize);
-        await Promise.allSettled(batch.map(async (user) => {
-          try {
-            const embed = new EmbedBuilder()
-              .setTitle('🆘 تم إنقاذك!')
-              .setDescription(messageContent)
-              .setColor(0x2ECC71)
-              .addFields(
-                { name: 'السيرفر', value: interaction.guild.name, inline: true },
-                { name: 'بواسطة', value: interaction.user.tag, inline: true },
-              )
-              .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
-              .setTimestamp();
-            if (inviteLink) {
-              embed.addFields({ name: 'رابط السيرفر', value: inviteLink, inline: false });
-            }
-            await user.send({ embeds: [embed] });
-            dmsSent++;
-          } catch {
-            dmsFailed++;
+      for (let i = 0; i < unbannedUsers.length; i++) {
+        const user = unbannedUsers[i];
+        try {
+          const embed = new EmbedBuilder()
+            .setTitle('🆘 تم إنقاذك!')
+            .setDescription(messageContent)
+            .setColor(0x2ECC71)
+            .addFields(
+              { name: 'السيرفر', value: interaction.guild.name, inline: true },
+              { name: 'بواسطة', value: interaction.user.tag, inline: true },
+            )
+            .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
+            .setTimestamp();
+          if (inviteLink) {
+            embed.addFields({ name: 'رابط السيرفر', value: inviteLink, inline: false });
           }
-        }));
-        await interaction.editReply({
-          content: `🔄 جاري إرسال الرسائل... (${Math.min(i + batchSize, unbannedUsers.length)}/${unbannedUsers.length})`,
-        }).catch(() => {});
-        await new Promise(r => setTimeout(r, 1000));
+          await user.send({ embeds: [embed] });
+          dmsSent++;
+        } catch {
+          dmsFailed++;
+        }
+
+        if ((i + 1) % 10 === 0 || (i + 1) === unbannedUsers.length) {
+          await interaction.editReply({
+            content: `🔄 جاري إرسال الرسائل... (${i + 1}/${unbannedUsers.length})`,
+          }).catch(() => {});
+        }
+
+        // 250ms delay between each DM to prevent bot rate-limits/bans
+        await new Promise(r => setTimeout(r, 250));
       }
 
       const resultEmbed = new EmbedBuilder()
@@ -146,7 +155,7 @@ export default {
       await interaction.editReply({ content: null, embeds: [resultEmbed], components: [] });
     } catch (error) {
       console.error('❌ Error in rescue command:', error);
-      await interaction.editReply({ content: '❌ حدث خطأ أثناء تنفيذ عملية الإنقاذ.' }).catch(() => {});
+      await interaction.editReply({ content: '❌ حدث خطأ أثناء تنفيذ عملية الإنقاذ.', components: [], embeds: [] }).catch(() => {});
     }
   }
 };

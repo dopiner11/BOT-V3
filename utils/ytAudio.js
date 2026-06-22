@@ -45,8 +45,6 @@ function baseOpts(extra = {}) {
     noWarnings: true,
     retries: 2,
     extractorArgs: 'youtube:player_client=tv_embedded',
-    impersonate: 'chrome',
-    jsRuntimes: 'node',
     ...extra,
   };
   if (hasWebCookies) opts.cookies = WEB_COOKIES_FILE;

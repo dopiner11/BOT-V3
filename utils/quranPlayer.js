@@ -4,43 +4,10 @@ import { loadConfig } from './configLoader.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { Readable } from 'stream';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import { gold as embedGold } from './embedStyles.js';
-import ytdl from '@distube/ytdl-core';
-import { execFile, exec } from 'child_process';
-import { promisify } from 'util';
 
-const execFileAsync = promisify(execFile);
-const execAsync = promisify(exec);
-
-// ─── yt-dlp: multiple resolution methods ────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const _cookiesPath = join(__dirname, '..', 'cookies.txt');
-const _hasCookies = existsSync(_cookiesPath);
-
-// Build all possible yt-dlp invocation methods
-function getYtdlpCommands() {
-  const cmds = [];
-  // 1. Pre-built binary from @distube/yt-dlp
-  const bundled = join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp');
-  const bundledExe = join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
-  if (existsSync(bundled)) {
-    cmds.push({ cmd: bundled, via: 'binary', method: 'execFile' });
-    cmds.push({ cmd: `"${bundled}"`, via: 'binary+shell', method: 'exec' }); // exec with shell
-  }
-  if (existsSync(bundledExe)) {
-    cmds.push({ cmd: bundledExe, via: 'binary.exe', method: 'execFile' });
-  }
-  // 2. yt-dlp on PATH
-  cmds.push({ cmd: 'yt-dlp', via: 'path', method: 'execFile' });
-  cmds.push({ cmd: 'yt-dlp', via: 'path+shell', method: 'exec' });
-  // 3. Python module
-  cmds.push({ cmd: 'python3', via: 'python3', args: ['-m', 'yt_dlp'], method: 'execFile' });
-  cmds.push({ cmd: 'python', via: 'python', args: ['-m', 'yt_dlp'], method: 'execFile' });
-  return cmds;
-}
-
-const _ytdlpCmds = getYtdlpCommands();
 
 const SURAHS = [
   { id: 1, name: 'الفاتحة', ayahCount: 7 },
@@ -163,10 +130,6 @@ function getReciters() {
   const reciters = {};
   const defaults = {
     basit: { name: 'عبد الباسط عبد الصمد', baseUrl: 'https://server7.mp3quran.net/basit' },
-    amer_al_kathimi: {
-      name: 'عامر الكاظمي',
-      youtubePlaylistId: 'PLQ6xMvrA8-AIGiyV4r6lzSJ2tKPtJOvpC'
-    },
   };
 
   if (config.quran && Array.isArray(config.quran.reciters)) {
@@ -174,8 +137,7 @@ function getReciters() {
       if (r.id) {
         reciters[r.id] = {
           name: r.name,
-          baseUrl: r.baseUrl || null,
-          youtubePlaylistId: r.youtubePlaylistId || null
+          baseUrl: r.baseUrl || null
         };
       }
     }
@@ -189,77 +151,8 @@ const ITEMS_PER_PAGE = 25;
 function getCustomAudioData() {
   const config = loadConfig();
   const defaults = {
-    duas: [
-      {
-        id: 'dua_kumayl',
-        name: 'دعاء كميل',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=fH_M44k6G4I' }
-        ]
-      },
-      {
-        id: 'dua_tawassul',
-        name: 'دعاء التوسل',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=1F_47Z4pE6I' },
-          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=A1qM5UzoMkE' }
-        ]
-      },
-      {
-        id: 'dua_nudba',
-        name: 'دعاء الندبة',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=t18WJ35QZ3I' }
-        ]
-      },
-      {
-        id: 'dua_ahd',
-        name: 'دعاء العهد',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=2TzC7s927_U' },
-          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=GMEvyA7TLH0' }
-        ]
-      }
-    ],
-    ziyarat: [
-      {
-        id: 'ziyarat_ashura',
-        name: 'زيارة عاشوراء',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=6v7a88Xk0zY' },
-          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=GG2McMgU2Co' }
-        ]
-      },
-      {
-        id: 'ziyarat_warith',
-        name: 'زيارة وارث',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=7X5C7Qd2Cis' }
-        ]
-      },
-      {
-        id: 'ziyarat_jamia',
-        name: 'الزيارة الجامعة',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=J2BsWq5BvVs' },
-          { id: 'mahmoud_sharifi', name: 'محمود شريفي', url: 'https://www.youtube.com/watch?v=7Dq3jfHFiYI' }
-        ]
-      },
-      {
-        id: 'ziyarat_ameen_allah',
-        name: 'زيارة أمين الله',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=1eJ422d3Z_E' }
-        ]
-      },
-      {
-        id: 'ziyarat_ale_yasin',
-        name: 'زيارة آل ياسين',
-        reciters: [
-          { id: 'basim_karbalai', name: 'باسم الكربلائي', url: 'https://www.youtube.com/watch?v=0hK2x9zK97E' }
-        ]
-      }
-    ]
+    duas: [],
+    ziyarat: []
   };
 
   const data = {};
@@ -281,132 +174,14 @@ function paginatedSurahs(page) {
 let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-// Cache: playlistId → { ids, expires }
-const playlistCache = new Map();
-
-// Fetch video IDs from a YouTube playlist by scraping the YouTube page
-async function fetchPlaylistVideoIds(playlistId) {
-  const cached = playlistCache.get(playlistId);
-  if (cached && Date.now() < cached.expires) return cached.ids;
-
-  const url = 'https://www.youtube.com/playlist?list=' + playlistId;
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) throw new Error('YouTube playlist HTTP ' + res.status);
-  const html = await res.text();
-  const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
-  let m;
-  const ids = new Set();
-  while ((m = re.exec(html)) !== null) ids.add(m[1]);
-  const result = [...ids];
-  if (result.length === 0) throw new Error('No video IDs found in playlist');
-  // Cache for 24 hours
-  playlistCache.set(playlistId, { ids: result, expires: Date.now() + 86400000 });
-  console.log('[QuranPlayer] Loaded', result.length, 'video IDs from playlist', playlistId);
-  return result;
-}
-
-// ─── Audio Resolution ────────────────────────────────────────────
-// Chain: latest yt-dlp (downloaded) → bundled yt-dlp → ytdl-core
-async function getAudioStream(videoId) {
-  const errors = [];
-
-  // ── Strategy 1: Latest yt-dlp (downloaded from GitHub) ─────────
-  try {
-    const { getStream } = await import('./lavalinkManager.js');
-    const stream = await getStream(videoId);
-    if (stream) return stream;
-  } catch (err) {
-    errors.push('dl-yt-dlp: ' + (err.message || '').slice(0, 120));
-  }
-
-  // ── Strategy 2: yt-dlp via any available method ─────────────────
-  const argSets = [
-    ['--format', 'bestaudio[ext=webm]/bestaudio/best', '--no-playlist', '--no-warnings', '-g', '--extractor-args', 'youtube:player_client=android', '--js-runtimes', 'node'],
-    ...(_hasCookies ? [
-      ['--format', 'bestaudio[ext=webm]/bestaudio/best', '--no-playlist', '--no-warnings', '-g', '--extractor-args', 'youtube:player_client=android', '--js-runtimes', 'node', '--cookies', _cookiesPath],
-      ['--format', 'bestaudio[ext=webm]/bestaudio/best', '--no-playlist', '--no-warnings', '-g', '--cookies', _cookiesPath],
-    ] : []),
-  ];
-
-  for (const baseArgs of argSets) {
-    for (const entry of _ytdlpCmds) {
-      try {
-        let stdout, stderr;
-        if (entry.method === 'exec') {
-          const shellCmd = entry.cmd + ' https://www.youtube.com/watch?v=' + videoId + ' ' + baseArgs.join(' ');
-          const result = await execAsync(shellCmd, { timeout: 25000, shell: true });
-          stdout = result.stdout;
-          stderr = result.stderr;
-        } else {
-          const args = entry.args ? [...entry.args, `https://www.youtube.com/watch?v=${videoId}`, ...baseArgs]
-                                  : [`https://www.youtube.com/watch?v=${videoId}`, ...baseArgs];
-          const result = await execFileAsync(entry.cmd, args, { timeout: 25000 });
-          stdout = result.stdout;
-          stderr = result.stderr;
-        }
-        const audioUrl = (stdout || '').trim();
-        if (audioUrl) {
-          const res = await fetch(audioUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(12000),
-          });
-          if (res.ok && res.body) {
-            console.log('[QuranPlayer] yt-dlp(' + entry.via + ') resolved', videoId);
-            return Readable.fromWeb(res.body);
-          }
-          errors.push(entry.via + ': HTTP ' + res.status);
-        } else {
-          const reason = (stderr || 'empty stdout').split('\n').pop().trim().slice(0, 60);
-          errors.push(entry.via + ': ' + reason);
-        }
-      } catch (err) {
-        const detail = err.stderr || err.message || err.code || String(err);
-        errors.push(entry.via + ': ' + detail.split('\n').pop().trim().slice(0, 80));
-      }
-    }
-  }
-
-  // ── Strategy 3: @distube/ytdl-core (fallback) ───────────────────
-  try {
-    const stream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' });
-    const ok = await Promise.race([
-      new Promise((resolve, reject) => {
-        stream.once('data', () => resolve(true));
-        stream.once('error', reject);
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('ytdl-core timeout')), 8000)),
-    ]);
-    if (ok) return stream;
-  } catch (err) {
-    errors.push('ytdl-core: ' + (err.message || '').split('\n')[0].slice(0, 80));
-  }
-
-  console.warn('[QuranPlayer] All methods failed for', videoId, ':', errors.join(' | '));
-  throw new Error('All audio sources failed for ' + videoId);
-}
 
 
 
-function extractVideoId(url) {
-  if (!url) return null;
-  const re = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = url.match(re);
-  return match ? match[1] : null;
-}
 
-function extractPlaylistId(input) {
-  if (!input) return null;
-  if (input.includes('list=')) {
-    const parts = input.split('list=')[1];
-    return parts.split('&')[0];
-  }
-  return input;
+
+
+function isDirectUrl(url) {
+  return url && (url.startsWith('http://') || url.startsWith('https://'));
 }
 
 // ─── Stream URL → Readable stream ─────────────────
@@ -456,7 +231,6 @@ function savePlayerState(player) {
       volume: player.volume,
       page: player.page,
       isPaused: player.isPaused,
-      playlistVideos: player.playlistVideos,
       lastActive: new Date().toISOString(),
     };
     writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
@@ -496,7 +270,6 @@ class QuranPlayer {
     this.volume = state?.volume ?? 0.5;
     this.page = state?.page || 0;
     this.reciterId = state?.reciterId || 'basit';
-    this.playlistVideos = state?.playlistVideos || [];
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
       this.isPaused = false;
@@ -549,25 +322,6 @@ class QuranPlayer {
       }
     });
   }
-  async fetchPlaylist(playlistId) {
-    try {
-      if (!playlistId) return false;
-      const cleanId = extractPlaylistId(playlistId);
-      const ids = await fetchPlaylistVideoIds(cleanId);
-      // Store as { id: videoId } objects; audio URLs fetched on demand
-      this.playlistVideos = ids.map((videoId, i) => ({ id: videoId, index: i }));
-      if (this.contentType === 'quran' && this.queue.length === 0) {
-        this.queue = SURAHS.map(s => s.id);
-        this.queueIndex = 0;
-      }
-      savePlayerState(this);
-      return true;
-    } catch (err) {
-      console.warn('[QuranPlayer] Failed to fetch playlist:', err.message);
-      return false;
-    }
-  }
-
   getReciterName() {
     if (this.contentType === 'quran') {
       return getReciters()[this.reciterId]?.name || 'غير محدد';
@@ -760,14 +514,9 @@ class QuranPlayer {
     return item ? item.id : null;
   }
 
-  async playUrl(urlOrStream, videoId) {
+  async playUrl(url) {
     try {
-      let stream;
-      if (typeof urlOrStream === 'string') {
-        stream = await streamUrl(urlOrStream);
-      } else {
-        stream = urlOrStream;
-      }
+      const stream = await streamUrl(url);
       consecutiveErrors = 0;
       this.resource = createAudioResource(stream, {
         inputType: StreamType.Arbitrary,
@@ -808,62 +557,25 @@ class QuranPlayer {
       }
     }
 
-    let url, currentVidId;
     if (this.contentType === 'quran') {
       const surahId = this.queue[this.queueIndex];
       const reciter = getReciters()[this.reciterId];
-      if (!reciter) return;
+      if (!reciter?.baseUrl) return;
       const surah = SURAHS.find(s => s.id === surahId);
       if (!surah) return;
       this.currentSurah = surah;
       this.currentItem = null;
-      if (reciter.youtubePlaylistId) {
-        if (this.playlistVideos.length === 0) {
-          const ok = await this.fetchPlaylist(reciter.youtubePlaylistId);
-          if (!ok) return;
-        }
-        const vid = this.playlistVideos[surahId - 1];
-        if (!vid) { console.warn('[QuranPlayer] No video for surah', surahId); return; }
-        currentVidId = vid.id;
-        try {
-          await this.playUrl(await getAudioStream(currentVidId), currentVidId);
-        } catch (err) {
-          console.warn('[QuranPlayer] Audio resolution failed for', currentVidId + ':', err.message);
-          consecutiveErrors++;
-          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-            console.warn('[QuranPlayer] Too many errors, stopping.');
-            this.queue = []; this.queueIndex = 0; savePlayerState(this); return;
-          }
-          setTimeout(() => this.playCurrent(), 3000);
-          return;
-        }
-      } else {
-        url = reciter.baseUrl + '/' + String(surahId).padStart(3, '0') + '.mp3';
-      }
+      const url = reciter.baseUrl + '/' + String(surahId).padStart(3, '0') + '.mp3';
+      await this.playUrl(url);
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       const item = items.find(it => it.name === this.currentItem);
       if (!item) return;
       const reciterCfg = item.reciters.find(r => r.id === this.reciterId);
-      if (!reciterCfg) return;
+      if (!reciterCfg?.url) return;
       this.currentSurah = null;
-
-      const extractedId = extractVideoId(reciterCfg.url);
-      if (extractedId) {
-        try {
-          await this.playUrl(await getAudioStream(extractedId), extractedId);
-        } catch (err) {
-          console.warn('[QuranPlayer] Audio resolution failed for custom audio:', err.message);
-          return;
-        }
-      } else {
-        url = reciterCfg.url;
-        await this.playUrl(url);
-      }
-      return;
+      await this.playUrl(reciterCfg.url);
     }
-
-    await this.playUrl(url, currentVidId);
   }
 
   async playRandom() {
@@ -874,25 +586,8 @@ class QuranPlayer {
       this.queue = [randomSurah.id];
       this.queueIndex = 0;
       const reciter = getReciters()[this.reciterId];
-      if (!reciter) return;
-      let url;
-      if (reciter.youtubePlaylistId) {
-        if (this.playlistVideos.length === 0) {
-          const ok = await this.fetchPlaylist(reciter.youtubePlaylistId);
-          if (!ok) return;
-        }
-        const vid = this.playlistVideos[randomSurah.id - 1];
-        if (!vid) return;
-        try {
-          await this.playUrl(await getAudioStream(vid.id), vid.id);
-        } catch (err) {
-          console.warn('[QuranPlayer] Audio resolution failed for random:', err.message);
-          setTimeout(() => this.playRandom(), 3000);
-          return;
-        }
-      } else {
-        this.playUrl(reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3');
-      }
+      if (!reciter?.baseUrl) return;
+      this.playUrl(reciter.baseUrl + '/' + String(randomSurah.id).padStart(3, '0') + '.mp3');
     } else {
       const items = this.contentType === 'dua' ? getCustomAudioData().duas : getCustomAudioData().ziyarat;
       if (items.length === 0) return;
@@ -900,22 +595,11 @@ class QuranPlayer {
       this.currentItem = randomItem.name;
       this.currentSurah = null;
       const rc = randomItem.reciters.find(r => r.id === this.reciterId) || randomItem.reciters[0];
-      if (!rc) return;
+      if (!rc?.url) return;
       this.reciterId = rc.id;
       this.queue = [randomItem.id];
       this.queueIndex = 0;
-
-      const vidId = extractVideoId(rc.url);
-      if (vidId) {
-        try {
-          await this.playUrl(await getAudioStream(vidId), vidId);
-        } catch (err) {
-          console.warn('[QuranPlayer] Audio resolution failed for custom audio:', err.message);
-          return;
-        }
-      } else {
-        this.playUrl(rc.url);
-      }
+      this.playUrl(rc.url);
     }
   }
 
@@ -969,7 +653,6 @@ class QuranPlayer {
     this.queue = [];
     this.queueIndex = 0;
     this.page = 0;
-    this.playlistVideos = [];
     this.audioPlayer.stop(true);
     savePlayerState(this);
   }
@@ -1001,13 +684,6 @@ class QuranPlayer {
 
   async setReciter(reciterId) {
     this.reciterId = reciterId;
-    const reciter = getReciters()[reciterId];
-    if (reciter?.youtubePlaylistId && this.playlistVideos.length === 0) {
-      await this.fetchPlaylist(reciter.youtubePlaylistId);
-    }
-    if (!reciter?.youtubePlaylistId) {
-      this.playlistVideos = [];
-    }
     if (this.queue.length > 0) {
       this.playCurrent();
     }

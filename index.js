@@ -184,10 +184,6 @@ client.once(Events.ClientReady, async () => {
       startExcuseNotifications(client);
       startVoteExpiryChecker(client);
       startDailyChallenge(client);
-      // Download latest yt-dlp binary in background
-      import('./utils/lavalinkManager.js').then(m =>
-        m.download().catch(e => console.warn('[Audio] yt-dlp download:', e?.message))
-      );
       const { initQuranPlayer } = await import('./utils/quranPlayer.js');
       initQuranPlayer(client);
       const { init: initCompetitions } = await import('./commands/competition.js');

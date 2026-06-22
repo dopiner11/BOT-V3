@@ -621,9 +621,50 @@ client.on(Events.GuildBanAdd, async (ban) => {
 client.on(Events.GuildMemberAdd, async (member) => {
   try {
     const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
-    await handleNukeMemberAdd(member);
+    if (config.antiNuke?.enabled) {
+      await handleNukeMemberAdd(member).catch(() => {});
+    }
   } catch {}
+
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    const memberRecord = await Member.findOne({ discordId: member.id });
+    if (memberRecord && memberRecord.isActive) {
+      // أ. استعادة الاسم المستعار
+      if (memberRecord.gameName && memberRecord.gameId) {
+        await member.setNickname(`IQ • ${memberRecord.gameName} X.IRAQ 〢${memberRecord.gameId}`).catch(() => {});
+      }
+
+      // ب. استعادة الرتب
+      const rolesToAdd = [];
+      if (config.roles?.basic?.id) rolesToAdd.push(config.roles.basic.id);
+      const jobRoleId = config.roles?.jobRoles?.[memberRecord.jobNumber?.toString()]?.id;
+      if (jobRoleId) rolesToAdd.push(jobRoleId);
+
+      if (memberRecord.currentRank && Array.isArray(config?.promotion?.ranks)) {
+        const rankConfig = config.promotion.ranks.find(r => r.name === memberRecord.currentRank);
+        if (rankConfig?.roleId) rolesToAdd.push(rankConfig.roleId);
+      }
+
+      const uniqueRoles = [...new Set(rolesToAdd.filter(Boolean))];
+      if (uniqueRoles.length > 0) {
+        await member.roles.add(uniqueRoles).catch(() => {});
+      }
+
+      // ج. تحديث صلاحيات الروم
+      if (memberRecord.roomChannelId) {
+        const room = await member.guild.channels.fetch(memberRecord.roomChannelId).catch(() => null);
+        if (room) {
+          await room.permissionOverwrites.edit(member.id, {
+            ViewChannel: true,
+            SendMessages: true
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error restoring joining family member:', err);
+  }
 });
 
 client.on(Events.GuildUpdate, async (oldGuild, newGuild) => {

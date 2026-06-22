@@ -26,6 +26,7 @@ function baseOpts(extra = {}) {
     noCheckCertificates: true,
     noWarnings: true,
     retries: 2,
+    extractorArgs: 'youtube:player_client=android,mweb',
     ...extra,
   };
   if (hasCookies) opts.cookies = COOKIES_FILE;
@@ -96,7 +97,12 @@ export async function getStream(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'ba[ext=webm]/ba[ext=m4a]/ba' }));
+  let info;
+  try {
+    info = await youtubedl(url, baseOpts({ format: 'bestaudio[protocol=https]/bestaudio' }));
+  } catch {
+    info = await youtubedl(url, baseOpts({}));
+  }
 
   if (!info || !info.url) throw new Error('No stream URL found');
 
@@ -121,7 +127,12 @@ export async function getStream(videoId) {
 
 export async function getStreamInfo(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await youtubedl(url, baseOpts({ format: 'ba[ext=webm]/ba[ext=m4a]/ba' }));
+  let info;
+  try {
+    info = await youtubedl(url, baseOpts({ format: 'bestaudio[protocol=https]/bestaudio' }));
+  } catch {
+    info = await youtubedl(url, baseOpts({}));
+  }
 
   if (!info || !info.url) throw new Error('No stream URL found');
 

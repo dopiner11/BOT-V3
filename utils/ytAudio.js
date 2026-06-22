@@ -46,25 +46,18 @@ export async function getStream(videoId) {
   if (cached) return cached;
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-
-  try {
-    const result = await timeout(YouTube.getStream(url), 30000);
-    const info = {
-      url: result.url,
-      type: result.type,
-      duration: result.duration || 0,
-      bitrate: result.bitrate || 0,
-      httpHeaders: result.httpHeaders || {},
-    };
-    streamCache.set(videoId, info);
-    return info;
-  } catch {}
-
   const formats = ['bestaudio*', 'bestaudio/best', 'best'];
+
   let lastError;
   for (const format of formats) {
     try {
-      const opts = YouTube.getYtDlpOptions({ dumpSingleJson: true, format, preferFreeFormats: true });
+      const opts = YouTube.getYtDlpOptions({
+        dumpSingleJson: true,
+        format,
+        preferFreeFormats: true,
+      });
+      opts.retries = 1;
+      opts.fragmentRetries = 1;
       const result = await timeout(ytdl(url, opts, { timeout: 30000 }), 35000);
       if (result?.url) {
         const info = {

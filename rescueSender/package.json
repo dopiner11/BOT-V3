@@ -1,0 +1,10 @@
+{
+  "name": "rescue-sender",
+  "version": "1.0.0",
+  "description": "إرسال رسائل إنقاذ عبر حسابات متعددة",
+  "main": "rescueSender.js",
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.13.4"
+  }
+}

@@ -17,7 +17,7 @@ export function setSenderClient(client) {
   senderClient = client;
 }
 
-function getSender() {
+export function getSender() {
   return senderClient;
 }
 

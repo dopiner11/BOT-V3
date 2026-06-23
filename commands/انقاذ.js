@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { getSender, logBroadcastComplete } from '../utils/broadcastSender.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -102,32 +103,43 @@ export default {
 
       await interaction.editReply({ content: `🔄 جاري إرسال الرسائل... (0/${unbannedUsers.length})`, components: [], embeds: [] });
 
+      const startTime = new Date();
       let dmsSent = 0;
       let dmsFailed = 0;
+      const errorsList = [];
       const inviteLink = interaction.guild.vanityURL
         ? `discord.gg/${interaction.guild.vanityURL}`
         : null;
 
+      const sender = getSender() || interaction.client;
+
       for (let i = 0; i < unbannedUsers.length; i++) {
         const user = unbannedUsers[i];
         try {
-          const embed = new EmbedBuilder()
-            .setTitle('🆘 تم إنقاذك!')
-            .setDescription(messageContent)
-            .setColor(0x2ECC71)
-            .addFields(
-              { name: 'السيرفر', value: interaction.guild.name, inline: true },
-              { name: 'بواسطة', value: interaction.user.tag, inline: true },
-            )
-            .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
-            .setTimestamp();
-          if (inviteLink) {
-            embed.addFields({ name: 'رابط السيرفر', value: inviteLink, inline: false });
+          const targetUser = sender.users.cache.get(user.id) || await sender.users.fetch(user.id).catch(() => null);
+          if (targetUser) {
+            const embed = new EmbedBuilder()
+              .setTitle('🆘 تم إنقاذك!')
+              .setDescription(messageContent)
+              .setColor(0x2ECC71)
+              .addFields(
+                { name: 'السيرفر', value: interaction.guild.name, inline: true },
+                { name: 'بواسطة', value: interaction.user.tag, inline: true },
+              )
+              .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
+              .setTimestamp();
+            if (inviteLink) {
+              embed.addFields({ name: 'رابط السيرفر', value: inviteLink, inline: false });
+            }
+            await targetUser.send({ embeds: [embed] });
+            dmsSent++;
+          } else {
+            dmsFailed++;
+            errorsList.push({ id: user.id, reason: 'user_not_found_on_sender' });
           }
-          await user.send({ embeds: [embed] });
-          dmsSent++;
-        } catch {
+        } catch (err) {
           dmsFailed++;
+          errorsList.push({ id: user.id, reason: err.message || 'DMs closed' });
         }
 
         if ((i + 1) % 10 === 0 || (i + 1) === unbannedUsers.length) {
@@ -136,9 +148,29 @@ export default {
           }).catch(() => {});
         }
 
-        // 250ms delay between each DM to prevent bot rate-limits/bans
-        await new Promise(r => setTimeout(r, 250));
+        // 1000ms delay between each DM to prevent bot rate-limits/bans (100% safe)
+        await new Promise(r => setTimeout(r, 1000));
       }
+
+      // إرسال تقرير بالكامل إلى روم لوغ البرودكاست
+      const fakeJob = {
+        guild: interaction.guild,
+        senderId: interaction.user.id,
+        type: '🆘 عملية إنقاذ (Rescue)',
+        status: 'completed',
+        startedAt: startTime,
+        completedAt: new Date(),
+        results: {
+          total: unbannedUsers.length,
+          sent: dmsSent,
+          failed: dmsFailed,
+          dmClosed: dmsFailed,
+          notFound: 0,
+          other: 0,
+          errors: errorsList
+        }
+      };
+      await logBroadcastComplete(fakeJob).catch((e) => console.error('Error logging rescue broadcast:', e));
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('✅ تمت عملية الإنقاذ بنجاح')

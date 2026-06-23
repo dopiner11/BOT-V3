@@ -1,11 +1,11 @@
 import { SlashCommandBuilder, MessageFlags, EmbedBuilder, AttachmentBuilder } from 'discord.js';
-import { writeFileSync } from 'fs';
+import { writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const OUTPUT_PATH = join(__dirname, '../../rescueSender/targets.json');
+const OUTPUT_PATH = join(__dirname, '..', 'rescueSender', 'targets.json');
 
 export default {
   data: new SlashCommandBuilder()
@@ -61,6 +61,7 @@ export default {
 
       // حفظ في ملف
       const data = JSON.stringify(unbannedIds, null, 2);
+      mkdirSync(dirname(OUTPUT_PATH), { recursive: true });
       writeFileSync(OUTPUT_PATH, data, 'utf8');
 
       // إرسال الملف

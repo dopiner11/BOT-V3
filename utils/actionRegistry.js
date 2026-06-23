@@ -380,6 +380,13 @@ export const commandRegistry = {
     description: 'فك الباند عن الكل وإرسال رسالة إنقاذ للجميع',
     usage: '/انقاذ الرسالة: ...',
   },
+  'تصدير_المنقذين': {
+    category: 'punishments',
+    committee: 'punishment',
+    action: 'unbanAll',
+    description: 'تصدير IDs اللي انفك باندهم لملف للـ rescueSender',
+    usage: '/تصدير_المنقذين [المدة: 60]',
+  },
 };
 
 /**

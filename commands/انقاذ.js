@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
-import { getSender, logBroadcastComplete } from '../utils/broadcastSender.js';
+import { getSender } from '../utils/broadcastSender.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -17,14 +17,19 @@ export default {
         .setMaxValue(1440)),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply();
 
     try {
       const messageContent = interaction.options.getString('الرسالة');
       const minutes = interaction.options.getInteger('المدة') || 60;
       const since = Date.now() - minutes * 60 * 1000;
 
-      await interaction.editReply('🔄 جاري البحث في سجل التدقيق...');
+      const scanEmbed = new EmbedBuilder()
+        .setTitle('🔍 جاري البحث في سجل التدقيق...')
+        .setColor(0x3498DB)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [scanEmbed] });
 
       const unbannedUsers = [];
       const seen = new Set();
@@ -61,7 +66,10 @@ export default {
       }
 
       if (unbannedUsers.length === 0) {
-        return interaction.editReply('❌ لم يتم العثور على أي أعضاء تم فك باندهم خلال الـ ' + minutes + ' دقيقة الماضية.');
+        return interaction.editReply({
+          content: null,
+          embeds: [new EmbedBuilder().setTitle('❌ لا يوجد أعضاء').setDescription(`لم يتم العثور على أي أعضاء تم فك باندهم خلال الـ ${minutes} دقيقة الماضية.`).setColor(0xE74C3C).setTimestamp()],
+        });
       }
 
       const confirmEmbed = new EmbedBuilder()
@@ -77,43 +85,90 @@ export default {
         .setTimestamp();
 
       const confirmId = `rescue_confirm_${interaction.user.id}`;
-      const cancelId = `rescue_cancel_${interaction.user.id}`;
+      const cancelConfirmId = `rescue_cancel_${interaction.user.id}`;
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(confirmId).setLabel('✅ تأكيد').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(cancelId).setLabel('❌ إلغاء').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(cancelConfirmId).setLabel('❌ إلغاء').setStyle(ButtonStyle.Secondary),
       );
 
       await interaction.editReply({ embeds: [confirmEmbed], components: [row] });
 
       const collected = await interaction.channel.awaitMessageComponent({
-        filter: i => [confirmId, cancelId].includes(i.customId) && i.user.id === interaction.user.id,
+        filter: i => [confirmId, cancelConfirmId].includes(i.customId) && i.user.id === interaction.user.id,
         time: 30000,
       }).catch(() => null);
 
-      if (!collected || collected.customId === cancelId) {
-        return interaction.editReply({ content: '✅ تم إلغاء العملية.', components: [], embeds: [] });
+      if (!collected || collected.customId === cancelConfirmId) {
+        const cancelledEmbed = new EmbedBuilder()
+          .setTitle('✅ تم إلغاء العملية')
+          .setColor(0x95A5A6)
+          .setTimestamp();
+        return interaction.editReply({ embeds: [cancelledEmbed], components: [] });
       }
 
-      try {
-        await collected.deferUpdate();
-      } catch (err) {
-        console.warn('⚠️ Warning: deferUpdate failed in rescue command:', err.message);
-      }
+      try { await collected.deferUpdate(); } catch {}
 
-      await interaction.editReply({ content: `🔄 جاري إرسال الرسائل... (0/${unbannedUsers.length})`, components: [], embeds: [] });
+      let cancelled = false;
+      const cancelSendId = `rescue_stop_${interaction.user.id}`;
+      const stopRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(cancelSendId).setLabel('⛔ إيقاف الإرسال').setStyle(ButtonStyle.Danger),
+      );
 
-      const startTime = new Date();
+      const liveEmbed = new EmbedBuilder()
+        .setTitle('🆘 جاري إرسال رسائل الإنقاذ...')
+        .setColor(0x3498DB)
+        .addFields(
+          { name: 'الإجمالي', value: `${unbannedUsers.length}`, inline: true },
+          { name: '✅ تم الإرسال', value: '0', inline: true },
+          { name: '❌ فشل', value: '0', inline: true },
+          { name: 'الحالة', value: '🟢 جاري الإرسال...', inline: false },
+        )
+        .setTimestamp();
+
+      const statusMsg = await interaction.editReply({ embeds: [liveEmbed], components: [stopRow] });
+
+      const startTime = Date.now();
       let dmsSent = 0;
       let dmsFailed = 0;
-      const errorsList = [];
       const inviteLink = interaction.guild.vanityURL
         ? `discord.gg/${interaction.guild.vanityURL}`
         : null;
 
       const sender = getSender() || interaction.client;
 
-      for (let i = 0; i < unbannedUsers.length; i++) {
+      async function updateLiveEmbed() {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const isDone = dmsSent + dmsFailed >= unbannedUsers.length;
+        const embed = new EmbedBuilder()
+          .setTitle(isDone ? '✅ تمت عملية الإنقاذ' : '🆘 جاري إرسال رسائل الإنقاذ...')
+          .setColor(isDone ? 0x2ECC71 : 0x3498DB)
+          .addFields(
+            { name: 'الإجمالي', value: `${unbannedUsers.length}`, inline: true },
+            { name: '✅ تم الإرسال', value: `${dmsSent}`, inline: true },
+            { name: '❌ فشل', value: `${dmsFailed}`, inline: true },
+            { name: '⏱ الوقت', value: `${elapsed} ثانية`, inline: true },
+            { name: 'الحالة', value: cancelled ? '⛔ تم الإيقاف' : (isDone ? '✅ اكتمل' : '🟢 جاري الإرسال...'), inline: false },
+          )
+          .setTimestamp();
+        try {
+          await interaction.editReply({ embeds: [embed], components: isDone || cancelled ? [] : [stopRow] });
+        } catch {}
+      }
+
+      const buttonCollector = statusMsg.createMessageComponentCollector({
+        filter: i => i.customId === cancelSendId && i.user.id === interaction.user.id,
+        time: 600000,
+      });
+
+      buttonCollector.on('collect', async (i) => {
+        cancelled = true;
+        try { await i.reply({ content: '⛔ تم إيقاف الإرسال.', flags: MessageFlags.Ephemeral }); } catch {}
+        await updateLiveEmbed();
+        buttonCollector.stop();
+      });
+
+      for (let i = 0; i < unbannedUsers.length && !cancelled; i++) {
         const user = unbannedUsers[i];
         try {
           const targetUser = sender.users.cache.get(user.id) || await sender.users.fetch(user.id).catch(() => null);
@@ -135,59 +190,29 @@ export default {
             dmsSent++;
           } else {
             dmsFailed++;
-            errorsList.push({ id: user.id, reason: 'user_not_found_on_sender' });
           }
-        } catch (err) {
+        } catch {
           dmsFailed++;
-          errorsList.push({ id: user.id, reason: err.message || 'DMs closed' });
         }
 
-        if ((i + 1) % 10 === 0 || (i + 1) === unbannedUsers.length) {
-          await interaction.editReply({
-            content: `🔄 جاري إرسال الرسائل... (${i + 1}/${unbannedUsers.length})`,
-          }).catch(() => {});
+        if ((i + 1) % 5 === 0 || cancelled || i + 1 === unbannedUsers.length) {
+          await updateLiveEmbed();
         }
 
-        // 1000ms delay between each DM to prevent bot rate-limits/bans (100% safe)
         await new Promise(r => setTimeout(r, 1000));
       }
 
-      // إرسال تقرير بالكامل إلى روم لوغ البرودكاست
-      const fakeJob = {
-        guild: interaction.guild,
-        senderId: interaction.user.id,
-        type: '🆘 عملية إنقاذ (Rescue)',
-        status: 'completed',
-        startedAt: startTime,
-        completedAt: new Date(),
-        results: {
-          total: unbannedUsers.length,
-          sent: dmsSent,
-          failed: dmsFailed,
-          dmClosed: dmsFailed,
-          notFound: 0,
-          other: 0,
-          errors: errorsList
-        }
-      };
-      await logBroadcastComplete(fakeJob).catch((e) => console.error('Error logging rescue broadcast:', e));
-
-      const resultEmbed = new EmbedBuilder()
-        .setTitle('✅ تمت عملية الإنقاذ بنجاح')
-        .setColor(0x2ECC71)
-        .addFields(
-          { name: 'الأعضاء', value: `${unbannedUsers.length}`, inline: true },
-          { name: 'رسائل وصلت', value: `${dmsSent}`, inline: true },
-          { name: 'رسائل فشلت', value: `${dmsFailed}`, inline: true },
-          { name: 'الفترة', value: `آخر ${minutes} دقيقة`, inline: true },
-          { name: 'بواسطة', value: interaction.user.tag, inline: true },
-        )
-        .setTimestamp();
-
-      await interaction.editReply({ content: null, embeds: [resultEmbed], components: [] });
+      if (!cancelled) {
+        await updateLiveEmbed();
+      }
     } catch (error) {
       console.error('❌ Error in rescue command:', error);
-      await interaction.editReply({ content: '❌ حدث خطأ أثناء تنفيذ عملية الإنقاذ.', components: [], embeds: [] }).catch(() => {});
+      try {
+        await interaction.editReply({
+          embeds: [new EmbedBuilder().setTitle('❌ حدث خطأ').setDescription(error.message).setColor(0xE74C3C).setTimestamp()],
+          components: [],
+        });
+      } catch {}
     }
   }
 };

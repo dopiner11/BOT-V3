@@ -1008,6 +1008,12 @@
     "enabled": true,
     "logChannelId": "1390328692148015205",
     "bypassRoleIds": ["1388879998739288154","1390306526136373312"],
+    "exceptionMultiplier": 4,
+    "exceptionEscalateToBan": true,
+    "escalationCooldownMs": 300000,
+    "auditLogFetchLimit": 10,
+    "cacheConfigIntervalMs": 30000,
+    "punishLockMs": 30000,
     "roleEditThreshold": 3,
     "roleDeleteThreshold": 2,
     "roleCreateThreshold": 3,
@@ -1025,7 +1031,30 @@
     "spamThreshold": 5,
     "emojiCreateThreshold": 3,
     "emojiUpdateThreshold": 3,
+    "emojiDeleteThreshold": 2,
+    "stickerCreateThreshold": 3,
+    "stickerDeleteThreshold": 2,
+    "threadDeleteThreshold": 3,
+    "unbanThreshold": 2,
     "guildUpdateThreshold": 2,
-    "spamTimeoutMinutes": 10
+    "spamTimeoutMinutes": 10,
+    "suspicion": {
+      "_label": "نظام كشف الاختراق الذكي",
+      "enabled": true,
+      "speedWeight": 30,
+      "crossCategoryWeight": 40,
+      "volumeWeight": 25,
+      "watchScore": 20,
+      "warnScore": 40,
+      "stripScore": 60,
+      "banScore": 80
+    },
+    "backup": {
+      "_label": "نظام النسخ الاحتياطي والاستعادة",
+      "enabled": true,
+      "autoRestore": true,
+      "intervalMinutes": 60,
+      "maxBackups": 5
+    }
   }
 }

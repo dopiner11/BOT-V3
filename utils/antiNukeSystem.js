@@ -17,18 +17,27 @@ const ADMIN_PERMISSIONS = [
   PermissionFlagsBits.ModerateMembers,
 ];
 
+let cachedConfig = null;
+let lastConfigLoad = 0;
+
 function loadConfig() {
-  return JSON.parse(readFileSync(join(__dirname, '../config.json'), 'utf8'));
+  const now = Date.now();
+  if (cachedConfig && now - lastConfigLoad < 30000) return cachedConfig;
+  cachedConfig = JSON.parse(readFileSync(join(__dirname, '../config.json'), 'utf8'));
+  lastConfigLoad = now;
+  return cachedConfig;
 }
 
 function getAntiNukeConfig() {
-  const config = loadConfig();
-  return config.antiNuke || {};
+  return loadConfig().antiNuke || {};
 }
 
 const actionCache = new Map();
 const CACHE_CLEAN_INTERVAL = 60000;
 const punishingUsers = new Set();
+const escalatedExceptions = new Map();
+
+const userSuspicion = new Map();
 
 setInterval(() => {
   const now = Date.now();
@@ -38,6 +47,19 @@ setInterval(() => {
     }
     const empty = [...actions.entries()].every(([_, d]) => d.timestamps.length === 0);
     if (empty) actionCache.delete(userId);
+  }
+
+  for (const [userId, record] of userSuspicion) {
+    record.actions = record.actions.filter(a => now - a.time < 60000);
+    if (record.actions.length === 0 && now - record.lastActionTime > 120000) {
+      userSuspicion.delete(userId);
+    }
+  }
+
+  for (const [userId, data] of escalatedExceptions) {
+    if (now - data.timestamp > (getAntiNukeConfig().escalationCooldownMs || 300000)) {
+      escalatedExceptions.delete(userId);
+    }
   }
 }, CACHE_CLEAN_INTERVAL);
 
@@ -54,21 +76,25 @@ function recordAction(userId, actionType, windowMs) {
   return action.timestamps.length;
 }
 
-function isExempt(member, config) {
+function getExemptionLevel(member, config) {
   const userId = member.id;
   const antiNuke = getAntiNukeConfig();
-  if ((config.committees?.founders || []).includes(userId)) return true;
-  if ((config.committees?.authorizedUsers || []).includes(userId)) return true;
+
+  if ((config.committees?.founders || []).includes(userId)) return 'founder';
+  if ((config.committees?.authorizedUsers || []).includes(userId)) return 'authorized';
+
   const bypassRoles = antiNuke.bypassRoleIds || [];
   for (const roleId of bypassRoles) {
-    if (member.roles?.cache?.has(roleId)) return true;
+    if (member.roles?.cache?.has(roleId)) return 'bypass';
   }
-  return false;
+  return null;
 }
 
 async function getAuditLogExecutor(guild, actionType, filterFn) {
   try {
-    const auditLogs = await guild.fetchAuditLogs({ type: actionType, limit: 5 });
+    const antiNuke = getAntiNukeConfig();
+    const limit = antiNuke.auditLogFetchLimit || 10;
+    const auditLogs = await guild.fetchAuditLogs({ type: actionType, limit });
     const entry = auditLogs.entries.find(filterFn || (() => true));
     return entry?.executor || null;
   } catch {
@@ -81,11 +107,10 @@ async function getRoleEditExecutor(guild, oldRole, newRole) {
   const changedColor = oldRole.color !== newRole.color;
   const changedPerms = oldRole.permissions.bitfield !== newRole.permissions.bitfield;
   if (!changedName && !changedColor && !changedPerms) return null;
-  const executor = await getAuditLogExecutor(guild, AuditLogEvent.RoleUpdate, entry => {
+  return await getAuditLogExecutor(guild, AuditLogEvent.RoleUpdate, entry => {
     const changes = entry.changes || [];
     return changes.some(c => ['name', 'color', 'permissions'].includes(c.key));
   });
-  return executor;
 }
 
 async function getRoleDeleteExecutor(guild) {
@@ -112,8 +137,19 @@ async function getBanExecutor(guild) {
   return await getAuditLogExecutor(guild, AuditLogEvent.MemberBanAdd, () => true);
 }
 
+async function getUnbanExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.MemberBanRemove, () => true);
+}
+
 async function getKickExecutor(guild) {
   return await getAuditLogExecutor(guild, AuditLogEvent.MemberKick, () => true);
+}
+
+async function getTimeoutExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.MemberUpdate, entry => {
+    const changes = entry.changes || [];
+    return changes.some(c => c.key === 'communication_disabled_until');
+  });
 }
 
 async function getWebhookCreateExecutor(guild) {
@@ -128,12 +164,32 @@ async function getGuildUpdateExecutor(guild) {
   return await getAuditLogExecutor(guild, AuditLogEvent.GuildUpdate, () => true);
 }
 
+async function getEmojiCreateExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.EmojiCreate, () => true);
+}
+
 async function getEmojiUpdateExecutor(guild) {
   return await getAuditLogExecutor(guild, AuditLogEvent.EmojiUpdate, () => true);
 }
 
-async function getEmojiCreateExecutor(guild) {
-  return await getAuditLogExecutor(guild, AuditLogEvent.EmojiCreate, () => true);
+async function getEmojiDeleteExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.EmojiDelete, () => true);
+}
+
+async function getStickerCreateExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.StickerCreate, () => true);
+}
+
+async function getStickerUpdateExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.StickerUpdate, () => true);
+}
+
+async function getStickerDeleteExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.StickerDelete, () => true);
+}
+
+async function getThreadDeleteExecutor(guild) {
+  return await getAuditLogExecutor(guild, AuditLogEvent.ThreadDelete, () => true);
 }
 
 async function hasAdminRoles(member) {
@@ -177,13 +233,13 @@ async function timeoutOnly(member, reason, durationMs = 600000) {
   }
 }
 
-async function punishRemoveAdminRoles(member, guild, reason) {
+async function punishRemoveAdminRoles(member, guild, reason, suspicionScore = 0) {
   if (!member || !guild) return false;
   try {
     const removed = await removeAdminRoles(member, reason);
     await new Promise(r => setTimeout(r, 500));
     await member.timeout(3600000, reason).catch(() => {});
-    await logPunishment(guild, member, reason, removed.length, false);
+    await logPunishment(guild, member, reason, removed.length, false, suspicionScore);
     return true;
   } catch {
     return false;
@@ -224,18 +280,18 @@ async function punishMember(member, guild, reason) {
   }
 }
 
-async function instantBan(member, guild, reason) {
+async function instantBan(member, guild, reason, suspicionScore = 0) {
   if (!member || !guild) return false;
   try {
     await guild.bans.create(member, { reason, deleteMessageSeconds: 3600 }).catch(() => {});
-    await logPunishment(guild, member, reason, 0, true);
+    await logPunishment(guild, member, reason, 0, true, suspicionScore);
     return true;
   } catch {
     return false;
   }
 }
 
-async function logPunishment(guild, member, reason, rolesRemoved, isBan) {
+async function logPunishment(guild, member, reason, rolesRemoved, isBan, suspicionScore = 0) {
   try {
     const config = loadConfig();
     const antiNuke = getAntiNukeConfig();
@@ -248,6 +304,7 @@ async function logPunishment(guild, member, reason, rolesRemoved, isBan) {
     if (isBan) { title = '⛔ باند فوري - Anti Nuke'; color = 0xE74C3C; }
     else if (rolesRemoved === 0 && reason.includes('سبام')) { title = '⏰ تايم آوت - Anti Nuke'; color = 0x3498DB; }
     else if (rolesRemoved >= 0 && reason.includes('إدارية')) { title = '🔰 سحب صلاحيات إدارية - Anti Nuke'; color = 0x9B59B6; }
+    else if (reason.includes('اختراق')) { title = '🚨 اختراق حساب - Anti Nuke'; color = 0xFF0000; }
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setColor(color)
@@ -259,33 +316,168 @@ async function logPunishment(guild, member, reason, rolesRemoved, isBan) {
       )
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
       .setTimestamp();
+    if (suspicionScore > 0) {
+      embed.addFields({ name: '⚠️ مؤشر الاختراق', value: `${suspicionScore}/100`, inline: true });
+    }
     await channel.send({ embeds: [embed] });
   } catch {}
 }
 
+function calculateSuspicion(userId, actionType) {
+  if (!userSuspicion.has(userId)) {
+    userSuspicion.set(userId, {
+      score: 0,
+      actions: [],
+      lastActionTime: Date.now(),
+      actionTypes: new Set()
+    });
+  }
+
+  const record = userSuspicion.get(userId);
+  const now = Date.now();
+  const timeSinceLast = now - record.lastActionTime;
+
+  record.actions.push({ type: actionType, time: now });
+  record.actionTypes.add(actionType);
+
+  record.actions = record.actions.filter(a => now - a.time < 60000);
+
+  const antiNuke = getAntiNukeConfig();
+  const suspicion = antiNuke.suspicion || {};
+  if (!suspicion.enabled) return 0;
+
+  const speedWeight = suspicion.speedWeight || 30;
+  const crossWeight = suspicion.crossCategoryWeight || 40;
+  const volumeWeight = suspicion.volumeWeight || 25;
+
+  let score = 0;
+
+  if (record.actions.length > 1 && timeSinceLast < 5000) score += speedWeight;
+  else if (record.actions.length > 1 && timeSinceLast < 15000) score += Math.floor(speedWeight / 2);
+
+  if (record.actionTypes.size >= 3) score += crossWeight;
+  else if (record.actionTypes.size >= 2) score += Math.floor(crossWeight / 2);
+
+  if (record.actions.length >= 10) score += volumeWeight;
+  else if (record.actions.length >= 5) score += Math.floor(volumeWeight / 2);
+
+  record.score = Math.min(100, score);
+  record.lastActionTime = now;
+
+  return record.score;
+}
+
+function getSuspicionLevel(score) {
+  const antiNuke = getAntiNukeConfig();
+  const suspicion = antiNuke.suspicion || {};
+  const watch = suspicion.watchScore || 20;
+  const warn = suspicion.warnScore || 40;
+  const strip = suspicion.stripScore || 60;
+  const ban = suspicion.banScore || 80;
+
+  if (score >= ban) return 'ban';
+  if (score >= strip) return 'strip';
+  if (score >= warn) return 'warn';
+  if (score >= watch) return 'watch';
+  return null;
+}
+
 async function checkAndPunish(member, guild, actionType, threshold, reasonBase, windowMs = 60000) {
-  if (punishingUsers.has(member.id)) return;
+  if (!member || punishingUsers.has(member.id)) return;
+
+  const config = loadConfig();
+  const exemption = getExemptionLevel(member, config);
+
+  let effectiveThreshold = threshold;
+  if (exemption) {
+    const antiNuke = getAntiNukeConfig();
+    const multiplier = antiNuke.exceptionMultiplier || 4;
+    effectiveThreshold = threshold * multiplier;
+  }
 
   const count = recordAction(member.id, actionType, windowMs);
-  if (count >= threshold) {
-    punishingUsers.add(member.id);
-    resetUserCache(member.id);
+  if (count < effectiveThreshold) return;
 
-    try {
+  punishingUsers.add(member.id);
+  resetUserCache(member.id);
+
+  const suspicionScore = calculateSuspicion(member.id, actionType);
+  const suspicionLevel = getSuspicionLevel(suspicionScore);
+
+  try {
+    if (exemption) {
+      const antiNuke = getAntiNukeConfig();
+      const escalateToBan = antiNuke.exceptionEscalateToBan !== false;
+
+      if (escalateToBan && escalatedExceptions.has(member.id)) {
+        await instantBan(member, guild,
+          `اختراق حساب مستثنى (${exemption}) - ${reasonBase} (${count}) - ${suspicionScore >= 60 ? 'مؤشر اختراق عالي' : 'تكرار بعد العقاب'} - Anti Nuke`,
+          suspicionScore
+        );
+      } else {
+        if (await hasAdminRoles(member)) {
+          await punishRemoveAdminRoles(member, guild,
+            `استثناء (${exemption}) - ${reasonBase} (${count}) - سحب صلاحيات إدارية - Anti Nuke`,
+            suspicionScore
+          );
+        } else {
+          await punishMember(member, guild,
+            `استثناء (${exemption}) - ${reasonBase} (${count}) - Anti Nuke`
+          );
+        }
+
+        if (escalateToBan) {
+          escalatedExceptions.set(member.id, { timestamp: Date.now() });
+        }
+      }
+
+      if (suspicionScore >= (getAntiNukeConfig().suspicion?.banScore || 80)) {
+        try {
+          const alertChannelId = getAntiNukeConfig().logChannelId;
+          if (alertChannelId) {
+            const ch = await guild.channels.fetch(alertChannelId).catch(() => null);
+            if (ch) {
+              await ch.send({
+                content: `🚨 **إنذار اختراق حساب!**\n<@${member.id}> (\`${member.user.tag}\`) — حساب مستثنى (\`${exemption}\`)\nمؤشر الاختراق: **${suspicionScore}/100**\nتم اتخاذ إجراء: ${suspicionScore >= 80 ? '⛔ باند فوري' : '🔰 سحب صلاحيات'}`
+              }).catch(() => {});
+            }
+          }
+        } catch {}
+      }
+    } else if (suspicionLevel === 'ban') {
+      const hasAdmin = await hasAdminRoles(member);
+      if (hasAdmin) {
+        await punishRemoveAdminRoles(member, guild,
+          `${reasonBase} (${count}) - مؤشر اختراق ${suspicionScore}/100 - سحب صلاحيات إدارية - Anti Nuke`,
+          suspicionScore
+        );
+      } else {
+        await instantBan(member, guild,
+          `${reasonBase} (${count}) - مؤشر اختراق ${suspicionScore}/100 - باند فوري - Anti Nuke`,
+          suspicionScore
+        );
+      }
+    } else {
       if (await hasAdminRoles(member)) {
-        await punishRemoveAdminRoles(member, guild, `${reasonBase} (${count}) - سحب صلاحيات إدارية - Anti Nuke`);
+        await punishRemoveAdminRoles(member, guild,
+          `${reasonBase} (${count}) - سحب صلاحيات إدارية - Anti Nuke`,
+          suspicionScore
+        );
       } else {
         const durationStr = windowMs === 10000 ? '10 ثواني' : (windowMs === 3000 ? '3 ثواني' : 'دقيقة');
-        await punishMember(member, guild, `${reasonBase} (${count} مرة خلال ${durationStr}) - Anti Nuke`);
+        await punishMember(member, guild,
+          `${reasonBase} (${count} مرة خلال ${durationStr}) - Anti Nuke`
+        );
       }
-    } catch (e) {
-      console.error('Error in checkAndPunish:', e);
     }
-
-    setTimeout(() => {
-      punishingUsers.delete(member.id);
-    }, 5000);
+  } catch (e) {
+    console.error('Error in checkAndPunish:', e);
   }
+
+  const lockMs = getAntiNukeConfig().punishLockMs || 30000;
+  setTimeout(() => {
+    punishingUsers.delete(member.id);
+  }, lockMs);
 }
 
 export async function handleGuildRoleUpdate(oldRole, newRole) {
@@ -297,7 +489,7 @@ export async function handleGuildRoleUpdate(oldRole, newRole) {
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleEditThreshold || 3;
   await checkAndPunish(member, guild, 'role_edit', threshold, 'تعديل رتب متكرر');
@@ -309,10 +501,15 @@ export async function handleGuildRoleDelete(role) {
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleDeleteThreshold || 2;
   await checkAndPunish(member, guild, 'role_delete', threshold, 'حذف رتب متكرر');
+
+  if (getAntiNukeConfig().backup?.autoRestore) {
+    const { autoRestoreRole } = await import('./backupSystem.js');
+    await autoRestoreRole(guild, role).catch(() => {});
+  }
 }
 
 export async function handleGuildRoleCreate(role) {
@@ -321,7 +518,7 @@ export async function handleGuildRoleCreate(role) {
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleCreateThreshold || 3;
   await checkAndPunish(member, guild, 'role_create', threshold, 'إنشاء رتب متكرر');
@@ -329,23 +526,30 @@ export async function handleGuildRoleCreate(role) {
 
 export async function handleChannelDelete(channel) {
   const guild = channel.guild;
+  if (!guild) return;
   const executor = await getChannelDeleteExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelDeleteThreshold || 2;
   await checkAndPunish(member, guild, 'channel_delete', threshold, 'حذف رومات متكرر');
+
+  if (getAntiNukeConfig().backup?.autoRestore) {
+    const { autoRestoreChannel } = await import('./backupSystem.js');
+    await autoRestoreChannel(guild, channel).catch(() => {});
+  }
 }
 
 export async function handleChannelCreate(channel) {
   const guild = channel.guild;
+  if (!guild) return;
   const executor = await getChannelCreateExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelCreateThreshold || 3;
   await checkAndPunish(member, guild, 'channel_create', threshold, 'إنشاء رومات متكرر');
@@ -353,11 +557,16 @@ export async function handleChannelCreate(channel) {
 
 export async function handleChannelUpdate(oldChannel, newChannel) {
   const guild = newChannel.guild;
+  if (!guild) return;
+  const oldPerms = oldChannel.permissionOverwrites?.cache;
+  const newPerms = newChannel.permissionOverwrites?.cache;
+  const permsChanged = oldPerms && newPerms && oldPerms.size !== newPerms.size;
+  if (!permsChanged) return;
   const executor = await getChannelUpdateExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelUpdateThreshold || 5;
   await checkAndPunish(member, guild, 'channel_update', threshold, 'تعديل صلاحيات رومات متكرر');
@@ -365,34 +574,51 @@ export async function handleChannelUpdate(oldChannel, newChannel) {
 
 export async function handleGuildBanAdd(ban) {
   const guild = ban.guild;
+  if (!guild) return;
   const executor = await getBanExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.banThreshold || 3;
   await checkAndPunish(member, guild, 'ban', threshold, 'باند متكرر');
 }
 
+export async function handleGuildBanRemove(ban) {
+  const guild = ban.guild;
+  if (!guild) return;
+  const executor = await getUnbanExecutor(guild);
+  if (!executor || executor.bot) return;
+  const config = loadConfig();
+  const member = guild.members.cache.get(executor.id);
+  if (!member) return;
+  const antiNuke = getAntiNukeConfig();
+  const threshold = antiNuke.unbanThreshold || 2;
+  await checkAndPunish(member, guild, 'unban', threshold, 'فك باند متكرر');
+}
+
 export async function handleGuildMemberKick(member) {
+  if (!member?.guild) return;
   const guild = member.guild;
   const executor = await getKickExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const modMember = guild.members.cache.get(executor.id);
-  if (!modMember || isExempt(modMember, config)) return;
+  if (!modMember) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.kickThreshold || 3;
   await checkAndPunish(modMember, guild, 'kick', threshold, 'كيك متكرر');
 }
 
-export async function handleGuildMemberTimeout(member, executorId) {
-  if (!executorId) return;
+export async function handleGuildMemberTimeout(member) {
+  if (!member?.guild) return;
   const guild = member.guild;
+  const executor = await getTimeoutExecutor(guild);
+  if (!executor || executor.bot) return;
   const config = loadConfig();
-  const modMember = guild.members.cache.get(executorId);
-  if (!modMember || isExempt(modMember, config)) return;
+  const modMember = guild.members.cache.get(executor.id);
+  if (!modMember) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.timeoutThreshold || 5;
   await checkAndPunish(modMember, guild, 'timeout', threshold, 'تايم آوت متكرر');
@@ -400,11 +626,12 @@ export async function handleGuildMemberTimeout(member, executorId) {
 
 export async function handleWebhookCreate(webhook) {
   const guild = webhook.guild;
+  if (!guild) return;
   const executor = await getWebhookCreateExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.webhookThreshold || 2;
   await checkAndPunish(member, guild, 'webhook_create', threshold, 'إنشاء ويب هوك متكرر');
@@ -412,26 +639,27 @@ export async function handleWebhookCreate(webhook) {
 
 export async function handleGuildMemberAdd(member) {
   const guild = member.guild;
-  if (!member.user.bot) return;
+  if (!guild || !member.user.bot) return;
   const config = loadConfig();
   const executor = await getBotAddExecutor(guild);
   if (!executor) return;
   const modMember = guild.members.cache.get(executor.id);
   if (!modMember) return;
-  if (isExempt(modMember, config)) return;
   if (punishingUsers.has(modMember.id)) return;
-  
+
   punishingUsers.add(modMember.id);
   await instantBan(modMember, guild, 'إضافة بوت - Anti Nuke');
   await instantBan(member, guild, 'دخول بوت غير مصرح به - Anti Nuke');
-  
+
+  const lockMs = getAntiNukeConfig().punishLockMs || 30000;
   setTimeout(() => {
     punishingUsers.delete(modMember.id);
-  }, 5000);
+  }, lockMs);
 }
 
 export async function handleGuildUpdate(oldGuild, newGuild) {
   const guild = newGuild;
+  if (!guild) return;
   const changedName = oldGuild.name !== newGuild.name;
   const changedIcon = oldGuild.icon !== newGuild.icon;
   if (!changedName && !changedIcon) return;
@@ -439,7 +667,7 @@ export async function handleGuildUpdate(oldGuild, newGuild) {
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.guildUpdateThreshold || 2;
   await checkAndPunish(member, guild, 'guild_update', threshold, 'تغيير إعدادات السيرفر متكرر');
@@ -447,11 +675,12 @@ export async function handleGuildUpdate(oldGuild, newGuild) {
 
 export async function handleGuildEmojiCreate(emoji) {
   const guild = emoji.guild;
+  if (!guild) return;
   const executor = await getEmojiCreateExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiCreateThreshold || 3;
   await checkAndPunish(member, guild, 'emoji_create', threshold, 'إنشاء إيموجي متكرر');
@@ -459,16 +688,69 @@ export async function handleGuildEmojiCreate(emoji) {
 
 export async function handleGuildEmojiUpdate(oldEmoji, newEmoji) {
   const guild = newEmoji.guild;
+  if (!guild) return;
   const changedName = oldEmoji.name !== newEmoji.name;
   if (!changedName) return;
   const executor = await getEmojiUpdateExecutor(guild);
   if (!executor || executor.bot) return;
   const config = loadConfig();
   const member = guild.members.cache.get(executor.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiUpdateThreshold || 3;
   await checkAndPunish(member, guild, 'emoji_update', threshold, 'تغيير إيموجي متكرر');
+}
+
+export async function handleGuildEmojiDelete(emoji) {
+  const guild = emoji.guild;
+  if (!guild) return;
+  const executor = await getEmojiDeleteExecutor(guild);
+  if (!executor || executor.bot) return;
+  const config = loadConfig();
+  const member = guild.members.cache.get(executor.id);
+  if (!member) return;
+  const antiNuke = getAntiNukeConfig();
+  const threshold = antiNuke.emojiDeleteThreshold || 2;
+  await checkAndPunish(member, guild, 'emoji_delete', threshold, 'حذف إيموجي متكرر');
+}
+
+export async function handleGuildStickerCreate(sticker) {
+  const guild = sticker.guild;
+  if (!guild) return;
+  const executor = await getStickerCreateExecutor(guild);
+  if (!executor || executor.bot) return;
+  const config = loadConfig();
+  const member = guild.members.cache.get(executor.id);
+  if (!member) return;
+  const antiNuke = getAntiNukeConfig();
+  const threshold = antiNuke.stickerCreateThreshold || 3;
+  await checkAndPunish(member, guild, 'sticker_create', threshold, 'إنشاء ستيكر متكرر');
+}
+
+export async function handleGuildStickerDelete(sticker) {
+  const guild = sticker.guild;
+  if (!guild) return;
+  const executor = await getStickerDeleteExecutor(guild);
+  if (!executor || executor.bot) return;
+  const config = loadConfig();
+  const member = guild.members.cache.get(executor.id);
+  if (!member) return;
+  const antiNuke = getAntiNukeConfig();
+  const threshold = antiNuke.stickerDeleteThreshold || 2;
+  await checkAndPunish(member, guild, 'sticker_delete', threshold, 'حذف ستيكر متكرر');
+}
+
+export async function handleThreadDelete(thread) {
+  const guild = thread.guild;
+  if (!guild) return;
+  const executor = await getThreadDeleteExecutor(guild);
+  if (!executor || executor.bot) return;
+  const config = loadConfig();
+  const member = guild.members.cache.get(executor.id);
+  if (!member) return;
+  const antiNuke = getAntiNukeConfig();
+  const threshold = antiNuke.threadDeleteThreshold || 3;
+  await checkAndPunish(member, guild, 'thread_delete', threshold, 'حذف ثريد متكرر');
 }
 
 export async function handleMessageDelete(message) {
@@ -477,7 +759,7 @@ export async function handleMessageDelete(message) {
   if (!guild) return;
   const config = loadConfig();
   const member = guild.members.cache.get(message.author.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.messageDeleteThreshold || 10;
   await checkAndPunish(member, guild, 'message_delete', threshold, 'حذف رسائل متكرر', 10000);
@@ -491,7 +773,7 @@ export async function handleMessageDeleteBulk(messages) {
   if (deletedBy && !deletedBy.bot) {
     const config = loadConfig();
     const member = guild.members.cache.get(deletedBy.id);
-    if (member && !isExempt(member, config)) {
+    if (member) {
       const antiNuke = getAntiNukeConfig();
       const threshold = antiNuke.bulkDeleteThreshold || 2;
       await checkAndPunish(member, guild, 'bulk_delete', threshold, 'حذف جماعي للرسائل متكرر');
@@ -510,7 +792,7 @@ export async function handleMassMention(message) {
   if (totalMentions < mentionThreshold) return;
   const config = loadConfig();
   const member = message.guild.members.cache.get(message.author.id);
-  if (!member || isExempt(member, config)) return;
+  if (!member) return;
   await message.delete().catch(() => {});
   const antiNukeConfig = getAntiNukeConfig();
   const repeatThreshold = antiNukeConfig.mentionRepeatThreshold || 2;
@@ -521,9 +803,8 @@ export async function handleSpam(message) {
   if (!message.guild || message.author.bot) return;
   const config = loadConfig();
   const member = message.guild.members.cache.get(message.author.id);
-  if (!member || isExempt(member, config)) return;
-  if (punishingUsers.has(member.id)) return;
-  
+  if (!member || punishingUsers.has(member.id)) return;
+
   const count = recordAction(message.author.id, 'spam', 3000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.spamThreshold || 5;
@@ -532,9 +813,10 @@ export async function handleSpam(message) {
     resetUserCache(member.id);
     await message.delete().catch(() => {});
     await timeoutOnly(member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 600000);
+    const lockMs = getAntiNukeConfig().punishLockMs || 30000;
     setTimeout(() => {
       punishingUsers.delete(member.id);
-    }, 5000);
+    }, lockMs);
   }
 }
 
@@ -564,4 +846,14 @@ export function resetUserCache(userId) {
 
 export function resetAllCache() {
   actionCache.clear();
+  userSuspicion.clear();
+  escalatedExceptions.clear();
+}
+
+export function getSuspicionData(userId) {
+  return userSuspicion.get(userId) || null;
+}
+
+export function getEscalationData(userId) {
+  return escalatedExceptions.get(userId) || null;
 }

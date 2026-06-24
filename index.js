@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Partials, Collection, Events, ActivityType, REST, Routes, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Collection, Events, ActivityType, REST, Routes, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, AuditLogEvent } from 'discord.js';
 import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -45,8 +45,13 @@ import pointsManager, { setPointsManagerContext } from './utils/pointsManager.js
 import {
   handleGuildRoleUpdate, handleGuildRoleDelete, handleGuildRoleCreate,
   handleChannelDelete, handleChannelCreate, handleChannelUpdate,
-  handleGuildBanAdd, handleGuildMemberAdd as handleNukeMemberAdd,
+  handleGuildBanAdd, handleGuildBanRemove,
+  handleGuildMemberAdd as handleNukeMemberAdd,
+  handleGuildMemberKick, handleGuildMemberTimeout,
   handleGuildUpdate, handleGuildEmojiCreate, handleGuildEmojiUpdate,
+  handleGuildEmojiDelete,
+  handleGuildStickerCreate, handleGuildStickerDelete,
+  handleThreadDelete,
   handleMessageDelete as handleNukeMessageDelete,
   handleMessageDeleteBulk as handleNukeMessageDeleteBulk,
   handleMassMention, handleSpam,
@@ -187,6 +192,8 @@ client.once(Events.ClientReady, async () => {
       startInteractionChecker(client);
       if (mainGuild) setPointsManagerContext(client, mainGuild);
       startCleanupScheduler(client);
+      const { startBackupScheduler } = await import('./utils/backupSystem.js');
+      startBackupScheduler(client);
       const { startStatsHub } = await import('./utils/statsHub.js');
       startStatsHub(client).catch(e => console.error('[StatsHub] startup:', e?.message));
       setupBroadcastSystem(client);
@@ -714,6 +721,72 @@ client.on(Events.WebhooksUpdate, async (channel) => {
     const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
     if (!config.antiNuke?.enabled) return;
     await handleWebhookCreate({ guild: channel.guild });
+  } catch {}
+});
+
+client.on(Events.GuildMemberRemove, async (member) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled || member.user?.bot) return;
+    const auditLogs = await member.guild?.fetchAuditLogs({ type: AuditLogEvent.MemberKick, limit: 1 }).catch(() => null);
+    if (!auditLogs || auditLogs.entries.size === 0) return;
+    await handleGuildMemberKick(member);
+  } catch {}
+});
+
+client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    const oldTimeout = oldMember.communicationDisabledUntil;
+    const newTimeout = newMember.communicationDisabledUntil;
+    if (oldTimeout === newTimeout) return;
+    if (!newTimeout) return;
+    await handleGuildMemberTimeout(newMember);
+  } catch {}
+});
+
+client.on(Events.GuildBanRemove, async (ban) => {
+  try {
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildBanRemove(ban);
+  } catch {}
+});
+
+client.on(Events.GuildEmojiDelete, async (emoji) => {
+  try {
+    if (!emoji.guild) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildEmojiDelete(emoji);
+  } catch {}
+});
+
+client.on(Events.GuildStickerCreate, async (sticker) => {
+  try {
+    if (!sticker.guild) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildStickerCreate(sticker);
+  } catch {}
+});
+
+client.on(Events.GuildStickerDelete, async (sticker) => {
+  try {
+    if (!sticker.guild) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleGuildStickerDelete(sticker);
+  } catch {}
+});
+
+client.on(Events.ThreadDelete, async (thread) => {
+  try {
+    if (!thread.guild) return;
+    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    if (!config.antiNuke?.enabled) return;
+    await handleThreadDelete(thread);
   } catch {}
 });
 

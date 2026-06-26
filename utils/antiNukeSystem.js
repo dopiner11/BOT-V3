@@ -36,6 +36,7 @@ const actionCache = new Map();
 const CACHE_CLEAN_INTERVAL = 60000;
 const punishingUsers = new Set();
 const escalatedExceptions = new Map();
+const botAdders = new Map();
 
 const userSuspicion = new Map();
 
@@ -59,6 +60,12 @@ setInterval(() => {
   for (const [userId, data] of escalatedExceptions) {
     if (now - data.timestamp > (getAntiNukeConfig().escalationCooldownMs || 300000)) {
       escalatedExceptions.delete(userId);
+    }
+  }
+
+  for (const [botId, record] of botAdders) {
+    if (now - record.timestamp > 3600000) {
+      botAdders.delete(botId);
     }
   }
 }, CACHE_CLEAN_INTERVAL);
@@ -88,6 +95,18 @@ function getExemptionLevel(member, config) {
     if (member.roles?.cache?.has(roleId)) return 'bypass';
   }
   return null;
+}
+
+function getBotAdderIfTracked(executor, guild) {
+  if (!executor || !executor.bot) return null;
+  const record = botAdders.get(executor.id);
+  if (!record) return null;
+  if (record.guildId !== guild.id) return null;
+  if (Date.now() - record.timestamp > 3600000) {
+    botAdders.delete(executor.id);
+    return null;
+  }
+  return guild.members.cache.get(record.adderId) || null;
 }
 
 async function getAuditLogExecutor(guild, actionType, filterFn) {
@@ -486,10 +505,10 @@ export async function handleGuildRoleUpdate(oldRole, newRole) {
   const changedColor = oldRole.color !== newRole.color;
   if (!changedName && !changedColor) return;
   const executor = await getRoleEditExecutor(guild, oldRole, newRole);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleEditThreshold || 3;
   await checkAndPunish(member, guild, 'role_edit', threshold, 'تعديل رتب متكرر');
@@ -498,10 +517,10 @@ export async function handleGuildRoleUpdate(oldRole, newRole) {
 export async function handleGuildRoleDelete(role) {
   const guild = role.guild;
   const executor = await getRoleDeleteExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleDeleteThreshold || 2;
   await checkAndPunish(member, guild, 'role_delete', threshold, 'حذف رتب متكرر');
@@ -515,10 +534,10 @@ export async function handleGuildRoleDelete(role) {
 export async function handleGuildRoleCreate(role) {
   const guild = role.guild;
   const executor = await getRoleCreateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.roleCreateThreshold || 3;
   await checkAndPunish(member, guild, 'role_create', threshold, 'إنشاء رتب متكرر');
@@ -528,10 +547,10 @@ export async function handleChannelDelete(channel) {
   const guild = channel.guild;
   if (!guild) return;
   const executor = await getChannelDeleteExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelDeleteThreshold || 2;
   await checkAndPunish(member, guild, 'channel_delete', threshold, 'حذف رومات متكرر');
@@ -546,10 +565,10 @@ export async function handleChannelCreate(channel) {
   const guild = channel.guild;
   if (!guild) return;
   const executor = await getChannelCreateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelCreateThreshold || 3;
   await checkAndPunish(member, guild, 'channel_create', threshold, 'إنشاء رومات متكرر');
@@ -563,10 +582,10 @@ export async function handleChannelUpdate(oldChannel, newChannel) {
   const permsChanged = oldPerms && newPerms && oldPerms.size !== newPerms.size;
   if (!permsChanged) return;
   const executor = await getChannelUpdateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.channelUpdateThreshold || 5;
   await checkAndPunish(member, guild, 'channel_update', threshold, 'تعديل صلاحيات رومات متكرر');
@@ -576,10 +595,10 @@ export async function handleGuildBanAdd(ban) {
   const guild = ban.guild;
   if (!guild) return;
   const executor = await getBanExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.banThreshold || 3;
   await checkAndPunish(member, guild, 'ban', threshold, 'باند متكرر');
@@ -589,10 +608,10 @@ export async function handleGuildBanRemove(ban) {
   const guild = ban.guild;
   if (!guild) return;
   const executor = await getUnbanExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.unbanThreshold || 2;
   await checkAndPunish(member, guild, 'unban', threshold, 'فك باند متكرر');
@@ -602,10 +621,10 @@ export async function handleGuildMemberKick(member) {
   if (!member?.guild) return;
   const guild = member.guild;
   const executor = await getKickExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const modMember = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const modMember = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!modMember) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.kickThreshold || 3;
   await checkAndPunish(modMember, guild, 'kick', threshold, 'كيك متكرر');
@@ -615,10 +634,10 @@ export async function handleGuildMemberTimeout(member) {
   if (!member?.guild) return;
   const guild = member.guild;
   const executor = await getTimeoutExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const modMember = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const modMember = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!modMember) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.timeoutThreshold || 5;
   await checkAndPunish(modMember, guild, 'timeout', threshold, 'تايم آوت متكرر');
@@ -628,10 +647,10 @@ export async function handleWebhookCreate(webhook) {
   const guild = webhook.guild;
   if (!guild) return;
   const executor = await getWebhookCreateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.webhookThreshold || 2;
   await checkAndPunish(member, guild, 'webhook_create', threshold, 'إنشاء ويب هوك متكرر');
@@ -646,6 +665,12 @@ export async function handleGuildMemberAdd(member) {
   const modMember = guild.members.cache.get(executor.id);
   if (!modMember) return;
   if (punishingUsers.has(modMember.id)) return;
+
+  const exemption = getExemptionLevel(modMember, config);
+  if (exemption) {
+    botAdders.set(member.id, { adderId: modMember.id, guildId: guild.id, timestamp: Date.now() });
+    return;
+  }
 
   punishingUsers.add(modMember.id);
   await instantBan(modMember, guild, 'إضافة بوت - Anti Nuke');
@@ -664,10 +689,10 @@ export async function handleGuildUpdate(oldGuild, newGuild) {
   const changedIcon = oldGuild.icon !== newGuild.icon;
   if (!changedName && !changedIcon) return;
   const executor = await getGuildUpdateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.guildUpdateThreshold || 2;
   await checkAndPunish(member, guild, 'guild_update', threshold, 'تغيير إعدادات السيرفر متكرر');
@@ -677,10 +702,10 @@ export async function handleGuildEmojiCreate(emoji) {
   const guild = emoji.guild;
   if (!guild) return;
   const executor = await getEmojiCreateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiCreateThreshold || 3;
   await checkAndPunish(member, guild, 'emoji_create', threshold, 'إنشاء إيموجي متكرر');
@@ -692,10 +717,10 @@ export async function handleGuildEmojiUpdate(oldEmoji, newEmoji) {
   const changedName = oldEmoji.name !== newEmoji.name;
   if (!changedName) return;
   const executor = await getEmojiUpdateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiUpdateThreshold || 3;
   await checkAndPunish(member, guild, 'emoji_update', threshold, 'تغيير إيموجي متكرر');
@@ -705,10 +730,10 @@ export async function handleGuildEmojiDelete(emoji) {
   const guild = emoji.guild;
   if (!guild) return;
   const executor = await getEmojiDeleteExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.emojiDeleteThreshold || 2;
   await checkAndPunish(member, guild, 'emoji_delete', threshold, 'حذف إيموجي متكرر');
@@ -718,10 +743,10 @@ export async function handleGuildStickerCreate(sticker) {
   const guild = sticker.guild;
   if (!guild) return;
   const executor = await getStickerCreateExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.stickerCreateThreshold || 3;
   await checkAndPunish(member, guild, 'sticker_create', threshold, 'إنشاء ستيكر متكرر');
@@ -731,10 +756,10 @@ export async function handleGuildStickerDelete(sticker) {
   const guild = sticker.guild;
   if (!guild) return;
   const executor = await getStickerDeleteExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.stickerDeleteThreshold || 2;
   await checkAndPunish(member, guild, 'sticker_delete', threshold, 'حذف ستيكر متكرر');
@@ -744,10 +769,10 @@ export async function handleThreadDelete(thread) {
   const guild = thread.guild;
   if (!guild) return;
   const executor = await getThreadDeleteExecutor(guild);
-  if (!executor || executor.bot) return;
-  const config = loadConfig();
-  const member = guild.members.cache.get(executor.id);
+  if (!executor) return;
+  const member = guild.members.cache.get(executor.id) || getBotAdderIfTracked(executor, guild);
   if (!member) return;
+  const config = loadConfig();
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.threadDeleteThreshold || 3;
   await checkAndPunish(member, guild, 'thread_delete', threshold, 'حذف ثريد متكرر');
@@ -782,7 +807,15 @@ export async function handleMessageDeleteBulk(messages) {
 }
 
 export async function handleMassMention(message) {
-  if (!message.guild || message.author.bot) return;
+  if (!message.guild) return;
+  let member;
+  if (message.author.bot) {
+    member = getBotAdderIfTracked(message.author, message.guild);
+    if (!member) return;
+  } else {
+    member = message.guild.members.cache.get(message.author.id);
+  }
+  if (!member) return;
   const mentionsEveryone = message.mentions.everyone;
   const userMentions = message.mentions.users.size;
   const roleMentions = message.mentions.roles.size;
@@ -790,9 +823,6 @@ export async function handleMassMention(message) {
   const antiNuke = getAntiNukeConfig();
   const mentionThreshold = antiNuke.mentionThreshold || 5;
   if (totalMentions < mentionThreshold) return;
-  const config = loadConfig();
-  const member = message.guild.members.cache.get(message.author.id);
-  if (!member) return;
   await message.delete().catch(() => {});
   const antiNukeConfig = getAntiNukeConfig();
   const repeatThreshold = antiNukeConfig.mentionRepeatThreshold || 2;
@@ -800,12 +830,18 @@ export async function handleMassMention(message) {
 }
 
 export async function handleSpam(message) {
-  if (!message.guild || message.author.bot) return;
+  if (!message.guild) return;
   const config = loadConfig();
-  const member = message.guild.members.cache.get(message.author.id);
+  let member;
+  if (message.author.bot) {
+    member = getBotAdderIfTracked(message.author, message.guild);
+    if (!member) return;
+  } else {
+    member = message.guild.members.cache.get(message.author.id);
+  }
   if (!member || punishingUsers.has(member.id)) return;
 
-  const count = recordAction(message.author.id, 'spam', 3000);
+  const count = recordAction(member.id, 'spam', 3000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.spamThreshold || 5;
   if (count >= threshold) {

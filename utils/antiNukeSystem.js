@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { EmbedBuilder, AuditLogEvent, PermissionFlagsBits } from 'discord.js';
@@ -38,19 +38,26 @@ const punishingUsers = new Set();
 const escalatedExceptions = new Map();
 const botAdders = new Map();
 
-/* --- Strike system (persistent, JSON-backed) --- */
+/* --- Strike system (persistent, JSON-backed, debounced) --- */
 const strikeRecords = new Map();
 const STRIKES_FILE = join(__dirname, '../.data/strikes.json');
+const STRIKES_DIR = dirname(STRIKES_FILE);
 let strikesLoaded = false;
+let strikeSaveTimer = null;
 
 function loadStrikes() {
   try {
     if (existsSync(STRIKES_FILE)) {
       const raw = readFileSync(STRIKES_FILE, 'utf8').trim();
       if (raw) {
+        const now = Date.now();
+        let changed = false;
         for (const item of JSON.parse(raw)) {
-          strikeRecords.set(`${item.memberId}_${item.actionType}`, item);
+          if (item.expiryAt > now) {
+            strikeRecords.set(`${item.memberId}_${item.actionType}`, item);
+          } else { changed = true; }
         }
+        if (changed) saveStrikes();
       }
     }
   } catch (e) { console.error('[Strikes] Load error:', e.message); }
@@ -58,8 +65,18 @@ function loadStrikes() {
 }
 
 function saveStrikes() {
-  try { writeFileSync(STRIKES_FILE, JSON.stringify([...strikeRecords.values()], null, 2), 'utf8'); }
-  catch (e) { console.error('[Strikes] Save error:', e.message); }
+  try {
+    if (!existsSync(STRIKES_DIR)) mkdirSync(STRIKES_DIR, { recursive: true });
+    writeFileSync(STRIKES_FILE, JSON.stringify([...strikeRecords.values()], null, 2), 'utf8');
+  } catch (e) { console.error('[Strikes] Save error:', e.message); }
+}
+
+function scheduleSaveStrikes() {
+  if (strikeSaveTimer) clearTimeout(strikeSaveTimer);
+  strikeSaveTimer = setTimeout(() => {
+    strikeSaveTimer = null;
+    saveStrikes();
+  }, 200);
 }
 
 function getStrikes() {
@@ -78,7 +95,7 @@ function incrementStrike(memberId, actionType, expiryMs = 86400000) {
   rec.lastStrikeAt = now;
   rec.expiryAt = now + expiryMs;
   strikeRecords.set(key, rec);
-  saveStrikes();
+  scheduleSaveStrikes();
   return rec.strikeCount;
 }
 
@@ -86,7 +103,7 @@ function cleanupExpiredStrikes() {
   const now = Date.now();
   let changed = false;
   for (const [k, r] of strikeRecords) { if (r.expiryAt < now) { strikeRecords.delete(k); changed = true; } }
-  if (changed) saveStrikes();
+  if (changed) scheduleSaveStrikes();
 }
 /* --- End Strike system --- */
 
@@ -459,8 +476,30 @@ function getStrikeActionConfig(actionType) {
   const antiNuke = getAntiNukeConfig();
   const strikes = antiNuke.strikes;
   if (!strikes || strikes.enabled === false) return null;
-  return strikes.actions?.[actionType] || null;
+  const actions = strikes.actions;
+  if (!actions || typeof actions !== 'object') return null;
+  return actions[actionType] || null;
 }
+
+function validateStrikeConfig() {
+  try {
+    const antiNuke = getAntiNukeConfig();
+    const strikes = antiNuke.strikes;
+    if (!strikes || strikes.enabled === false) return;
+    const actions = strikes.actions;
+    if (!actions) return;
+    const validActions = ['dm', 'timeout', 'strip_admin', 'ban', 'none'];
+    for (const [actionType, cfg] of Object.entries(actions)) {
+      for (let i = 1; i <= 3; i++) {
+        const level = cfg[`strike${i}`];
+        if (level && !validActions.includes(level.action)) {
+          console.warn(`[AntiNuke] ⚠️ إعدادات خاطئة: strike${i} action="${level.action}" في "${actionType}"`);
+        }
+      }
+    }
+  } catch (e) { console.error('[AntiNuke] Config validation error:', e.message); }
+}
+validateStrikeConfig();
 
 const STRIKE_ACTION_NAMES = {
   mass_mention: 'المنشن الجماعي',
@@ -472,40 +511,51 @@ const STRIKE_ACTION_NAMES = {
   channel_create: 'إنشاء الرومات',
   channel_update: 'تعديل الرومات',
   webhook_create: 'إنشاء ويب هوك',
-  ban: 'باند',
-  unban: 'فك باند',
-  kick: 'كيك',
-  timeout: 'تايم آوت',
+  ban: 'حظر (باند) أعضاء',
+  unban: 'فك الحظر',
+  kick: 'طرد أعضاء',
+  timeout: 'كتم (تايم آوت)',
   message_delete: 'حذف رسائل',
-  bulk_delete: 'حذف جماعي',
+  bulk_delete: 'حذف جماعي للرسائل',
   emoji_create: 'إنشاء إيموجي',
   emoji_update: 'تعديل إيموجي',
   emoji_delete: 'حذف إيموجي',
   sticker_create: 'إنشاء ستيكر',
   sticker_delete: 'حذف ستيكر',
   thread_delete: 'حذف ثريد',
-  guild_update: 'تعديل السيرفر',
+  guild_update: 'تعديل إعدادات السيرفر',
+};
+
+const STRIKE_WARNINGS = { 1: 'الأول', 2: 'الثاني', 3: 'الثالث' };
+const STRIKE_CONSEQUENCES = {
+  1: 'إنذار فقط — لا توجد عقوبة هذه المرة.',
+  2: 'سيتم عمل تايم آوت لمدة 30 دقيقة.',
+  3: 'سيتم سحب الرتب مع تايم آوت.',
 };
 
 async function sendStrikeDm(member, reasonBase, strikeCount, actionType) {
   if (!member) return;
   try {
     const name = STRIKE_ACTION_NAMES[actionType] || actionType;
+    const strikeLabel = STRIKE_WARNINGS[Math.min(strikeCount, 3)] || `${strikeCount}`;
+    const consequence = STRIKE_CONSEQUENCES[Math.min(strikeCount, 3)] || 'سيتم اتخاذ إجراءات أشد.';
     await member.send({
       embeds: [new EmbedBuilder()
-        .setTitle(`⚠️ إنذار ${strikeCount} - ${name}`)
+        .setTitle(`⚠️ إنذار ${strikeLabel} - ${name}`)
         .setDescription(
           `عزيزي ${member.user.tag}،\n\n` +
-          `نود تنبيهك أنه تم رصد تكرار **${name}** من قبلك بشكل غير مسموح به.\n` +
-          (strikeCount === 1
-            ? 'هذا إنذار أول — يرجى التوقف عن هذا السلوك.\n'
-            : 'هذا تكرار للسلوك المخالف — يرجى التوقف فوراً.\n') +
-          `إذا استمر التكرار، سيتم اتخاذ إجراءات أشد بحقك.`
+          `تم رصد مخالفة **${name}** من قبلك.\n` +
+          `هذا الإنذار **${strikeLabel}** من أصل 3.\n\n` +
+          `**العقوبة المطبقة:** ${consequence}\n\n` +
+          `_تنتهي صلاحية الإنذارات بعد 24 ساعة من آخر مخالفة._`
         )
         .setColor(0xF39C12)
+        .setFooter({ text: 'X.IRAQ FAMILY - نظام الحماية' })
         .setTimestamp()
       ]
-    }).catch(() => {});
+    }).catch(() => {
+      console.warn(`[AntiNuke] فشل إرسال DM إنذار للعضو ${member.id} (${actionType}, strike ${strikeCount})`);
+    });
   } catch {}
 }
 
@@ -975,16 +1025,22 @@ export async function handleMassMention(message) {
     member = message.guild.members.cache.get(message.author.id);
   }
   if (!member) return;
-  const mentionsEveryone = message.mentions.everyone;
-  const userMentions = message.mentions.users.size;
-  const roleMentions = message.mentions.roles.size;
-  const totalMentions = userMentions + roleMentions + (mentionsEveryone ? 10 : 0);
+
+  const hasEveryone = message.mentions.everyone;
+  const roleCount = message.mentions.roles.size;
+  const userMentionCount = message.mentions.users.size;
+
+  let weight = 0;
+  if (hasEveryone) weight += 50;
+  weight += roleCount * 15;
+  weight += userMentionCount * 1;
+
   const antiNuke = getAntiNukeConfig();
   const mentionThreshold = antiNuke.mentionThreshold || 5;
-  if (totalMentions < mentionThreshold) return;
+  if (weight < mentionThreshold) return;
+
   await message.delete().catch(() => {});
-  const antiNukeConfig = getAntiNukeConfig();
-  const repeatThreshold = antiNukeConfig.mentionRepeatThreshold || 2;
+  const repeatThreshold = antiNuke.mentionRepeatThreshold || 2;
   await checkAndPunish(member, message.guild, 'mass_mention', repeatThreshold, 'منشن جماعي متكرر');
 }
 
@@ -998,6 +1054,9 @@ export async function handleSpam(message) {
     member = message.guild.members.cache.get(message.author.id);
   }
   if (!member) return;
+
+  const config = loadConfig();
+  if (getExemptionLevel(member, config)) return;
 
   if (punishingUsers.has(member.id)) {
     await message.delete().catch(() => {});
@@ -1059,6 +1118,10 @@ export async function unbanAll(guild, modUser) {
     failed = -1;
   }
   return { unbanned, failed };
+}
+
+export function isNukeEnabled() {
+  return getAntiNukeConfig().enabled === true;
 }
 
 export function resetUserCache(userId) {

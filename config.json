@@ -1057,14 +1057,14 @@
         "mass_mention": {
           "strikeExpiryHours": 24,
           "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 10 },
-          "strike3": { "action": "timeout", "log": true, "timeoutMinutes": 60 }
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
         },
         "spam": {
           "strikeExpiryHours": 24,
           "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 10 },
-          "strike3": { "action": "timeout", "log": true, "timeoutMinutes": 60 }
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
         }
       }
     },

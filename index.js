@@ -56,6 +56,7 @@ import {
   handleMessageDeleteBulk as handleNukeMessageDeleteBulk,
   handleMassMention, handleSpam,
   handleWebhookCreate,
+  isNukeEnabled,
 } from './utils/antiNukeSystem.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -568,103 +569,87 @@ client.on(Events.MessageCreate, async (message) => {
    =================================================================== */
 client.on(Events.GuildRoleUpdate, async (oldRole, newRole) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildRoleUpdate(oldRole, newRole);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildRoleDelete, async (role) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildRoleDelete(role);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildRoleCreate, async (role) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildRoleCreate(role);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.ChannelDelete, async (channel) => {
   try {
     if (channel.isDMBased()) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleChannelDelete(channel);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.ChannelCreate, async (channel) => {
   try {
     if (channel.isDMBased()) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleChannelCreate(channel);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
   try {
     if (newChannel.isDMBased()) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleChannelUpdate(oldChannel, newChannel);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildBanAdd, async (ban) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildBanAdd(ban);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildMemberAdd, async (member) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (config.antiNuke?.enabled) {
+    if (isNukeEnabled()) {
       await handleNukeMemberAdd(member).catch(() => {});
     }
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+    const cfgCache = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
     const memberRecord = await Member.findOne({ discordId: member.id });
     if (memberRecord && memberRecord.isActive) {
-      // أ. استعادة الاسم المستعار
       if (memberRecord.gameName && memberRecord.gameId) {
         await member.setNickname(`IQ • ${memberRecord.gameName} X.IRAQ 〢${memberRecord.gameId}`).catch(() => {});
       }
-
-      // ب. استعادة الرتب
       const rolesToAdd = [];
-      if (config.roles?.basic?.id) rolesToAdd.push(config.roles.basic.id);
-      const jobRoleId = config.roles?.jobRoles?.[memberRecord.jobNumber?.toString()]?.id;
+      if (cfgCache.roles?.basic?.id) rolesToAdd.push(cfgCache.roles.basic.id);
+      const jobRoleId = cfgCache.roles?.jobRoles?.[memberRecord.jobNumber?.toString()]?.id;
       if (jobRoleId) rolesToAdd.push(jobRoleId);
-
-      if (memberRecord.currentRank && Array.isArray(config?.promotion?.ranks)) {
-        const rankConfig = config.promotion.ranks.find(r => r.name === memberRecord.currentRank);
+      if (memberRecord.currentRank && Array.isArray(cfgCache?.promotion?.ranks)) {
+        const rankConfig = cfgCache.promotion.ranks.find(r => r.name === memberRecord.currentRank);
         if (rankConfig?.roleId) rolesToAdd.push(rankConfig.roleId);
       }
-
       const uniqueRoles = [...new Set(rolesToAdd.filter(Boolean))];
       if (uniqueRoles.length > 0) {
         await member.roles.add(uniqueRoles).catch(() => {});
       }
-
-      // ج. تحديث صلاحيات الروم
       if (memberRecord.roomChannelId) {
         const room = await member.guild.channels.fetch(memberRecord.roomChannelId).catch(() => null);
         if (room) {
           await room.permissionOverwrites.edit(member.id, {
-            ViewChannel: true,
-            SendMessages: true
+            ViewChannel: true, SendMessages: true
           }).catch(() => {});
         }
       }
@@ -676,118 +661,105 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
 client.on(Events.GuildUpdate, async (oldGuild, newGuild) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildUpdate(oldGuild, newGuild);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildEmojiCreate, async (emoji) => {
   try {
     if (!emoji.guild) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildEmojiCreate(emoji);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildEmojiUpdate, async (oldEmoji, newEmoji) => {
   try {
     if (!newEmoji.guild) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildEmojiUpdate(oldEmoji, newEmoji);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.MessageDelete, async (message) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleNukeMessageDelete(message);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.MessageDeleteBulk, async (messages) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleNukeMessageDeleteBulk(messages);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.WebhooksUpdate, async (channel) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleWebhookCreate({ guild: channel.guild });
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildMemberRemove, async (member) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled || member.user?.bot) return;
+    if (!isNukeEnabled() || member.user?.bot) return;
     const auditLogs = await member.guild?.fetchAuditLogs({ type: AuditLogEvent.MemberKick, limit: 1 }).catch(() => null);
     if (!auditLogs || auditLogs.entries.size === 0) return;
     await handleGuildMemberKick(member);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     const oldTimeout = oldMember.communicationDisabledUntil;
     const newTimeout = newMember.communicationDisabledUntil;
     if (oldTimeout === newTimeout) return;
     if (!newTimeout) return;
     await handleGuildMemberTimeout(newMember);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildBanRemove, async (ban) => {
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildBanRemove(ban);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildEmojiDelete, async (emoji) => {
   try {
     if (!emoji.guild) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildEmojiDelete(emoji);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildStickerCreate, async (sticker) => {
   try {
     if (!sticker.guild) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildStickerCreate(sticker);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.GuildStickerDelete, async (sticker) => {
   try {
     if (!sticker.guild) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleGuildStickerDelete(sticker);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 client.on(Events.ThreadDelete, async (thread) => {
   try {
     if (!thread.guild) return;
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (!config.antiNuke?.enabled) return;
+    if (!isNukeEnabled()) return;
     await handleThreadDelete(thread);
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 /* ===================================================================

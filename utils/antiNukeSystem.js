@@ -1,8 +1,7 @@
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { EmbedBuilder, AuditLogEvent, PermissionFlagsBits } from 'discord.js';
-import Strike from '../models/Strike.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,6 +38,58 @@ const punishingUsers = new Set();
 const escalatedExceptions = new Map();
 const botAdders = new Map();
 
+/* --- Strike system (persistent, JSON-backed) --- */
+const strikeRecords = new Map();
+const STRIKES_FILE = join(__dirname, '../.data/strikes.json');
+let strikesLoaded = false;
+
+function loadStrikes() {
+  try {
+    if (existsSync(STRIKES_FILE)) {
+      const raw = readFileSync(STRIKES_FILE, 'utf8').trim();
+      if (raw) {
+        for (const item of JSON.parse(raw)) {
+          strikeRecords.set(`${item.memberId}_${item.actionType}`, item);
+        }
+      }
+    }
+  } catch (e) { console.error('[Strikes] Load error:', e.message); }
+  strikesLoaded = true;
+}
+
+function saveStrikes() {
+  try { writeFileSync(STRIKES_FILE, JSON.stringify([...strikeRecords.values()], null, 2), 'utf8'); }
+  catch (e) { console.error('[Strikes] Save error:', e.message); }
+}
+
+function getStrikes() {
+  if (!strikesLoaded) loadStrikes();
+  return strikeRecords;
+}
+
+function incrementStrike(memberId, actionType, expiryMs = 86400000) {
+  getStrikes();
+  const key = `${memberId}_${actionType}`;
+  const now = Date.now();
+  let rec = strikeRecords.get(key);
+  if (rec && rec.expiryAt < now) { strikeRecords.delete(key); rec = null; }
+  if (!rec) rec = { memberId, actionType, strikeCount: 0, firstStrikeAt: now, lastStrikeAt: now, expiryAt: now + expiryMs };
+  rec.strikeCount++;
+  rec.lastStrikeAt = now;
+  rec.expiryAt = now + expiryMs;
+  strikeRecords.set(key, rec);
+  saveStrikes();
+  return rec.strikeCount;
+}
+
+function cleanupExpiredStrikes() {
+  const now = Date.now();
+  let changed = false;
+  for (const [k, r] of strikeRecords) { if (r.expiryAt < now) { strikeRecords.delete(k); changed = true; } }
+  if (changed) saveStrikes();
+}
+/* --- End Strike system --- */
+
 const userSuspicion = new Map();
 
 setInterval(() => {
@@ -69,6 +120,8 @@ setInterval(() => {
       botAdders.delete(botId);
     }
   }
+
+  cleanupExpiredStrikes();
 }, CACHE_CLEAN_INTERVAL);
 
 function recordAction(userId, actionType, windowMs) {
@@ -559,24 +612,25 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
       const strikeConfig = getStrikeActionConfig(actionType);
       if (strikeConfig) {
         const expiryMs = (strikeConfig.strikeExpiryHours || 24) * 3600000;
-        const strike = await Strike.increment(member.id, actionType, guild.id, expiryMs);
-        const sc = strike.strikeCount;
+        const sc = incrementStrike(member.id, actionType, expiryMs);
         const levelKey = `strike${Math.min(sc, 3)}`;
         const actionCfg = strikeConfig[levelKey] || strikeConfig.strike3;
 
         if (actionCfg) {
+          const reason = `${reasonBase} (إنذار ${sc})`;
           if (actionCfg.action === 'dm') {
             await sendStrikeDm(member, reasonBase, sc, actionType);
           } else if (actionCfg.action === 'timeout') {
-            const dur = (actionCfg.timeoutMinutes || 10) * 60000;
-            await timeoutOnly(member, `${reasonBase} (إنذار ${sc})`, dur);
+            await member.timeout((actionCfg.timeoutMinutes || 10) * 60000, reason).catch(() => {});
           } else if (actionCfg.action === 'strip_admin') {
-            await punishRemoveAdminRoles(member, guild, `${reasonBase} (إنذار ${sc})`, suspicionScore);
+            await removeAdminRoles(member, reason);
+            await new Promise(r => setTimeout(r, 500));
+            await member.timeout(3600000, reason).catch(() => {});
           } else if (actionCfg.action === 'ban') {
-            await instantBan(member, guild, `${reasonBase} (إنذار ${sc})`, suspicionScore);
+            await guild.bans.create(member, { reason, deleteMessageSeconds: 3600 }).catch(() => {});
           }
 
-          if (actionCfg.log !== false && (actionCfg.action === 'timeout' || actionCfg.action === 'strip_admin' || actionCfg.action === 'ban')) {
+          if (actionCfg.log !== false && actionCfg.action !== 'dm') {
             await logStrikePunishment(guild, member, reasonBase, sc, actionType);
           }
         }
@@ -936,7 +990,6 @@ export async function handleMassMention(message) {
 
 export async function handleSpam(message) {
   if (!message.guild) return;
-  const config = loadConfig();
   let member;
   if (message.author.bot) {
     member = getBotAdderIfTracked(message.author, message.guild);
@@ -944,43 +997,45 @@ export async function handleSpam(message) {
   } else {
     member = message.guild.members.cache.get(message.author.id);
   }
-  if (!member || punishingUsers.has(member.id)) return;
+  if (!member) return;
+
+  await message.delete().catch(() => {});
+  if (punishingUsers.has(member.id)) return;
 
   const count = recordAction(member.id, 'spam', 3000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.spamThreshold || 5;
-  if (count >= threshold) {
-    punishingUsers.add(member.id);
-    resetUserCache(member.id);
-    await message.delete().catch(() => {});
-    const strikeConfig = getStrikeActionConfig('spam');
-    if (strikeConfig) {
-      const expiryMs = (strikeConfig.strikeExpiryHours || 24) * 3600000;
-      const strike = await Strike.increment(member.id, 'spam', message.guild.id, expiryMs);
-      const sc = strike.strikeCount;
-      const levelKey = `strike${Math.min(sc, 3)}`;
-      const actionCfg = strikeConfig[levelKey] || strikeConfig.strike3;
-      if (actionCfg) {
-        if (actionCfg.action === 'dm') {
-          await sendStrikeDm(member, 'سبام', sc, 'spam');
-        } else if (actionCfg.action === 'timeout') {
-          const dur = (actionCfg.timeoutMinutes || 10) * 60000;
-          await timeoutOnly(member, `سبام (إنذار ${sc})`, dur);
-        } else if (actionCfg.action === 'ban') {
-          await instantBan(member, message.guild, `سبام (إنذار ${sc})`);
-        }
-        if (actionCfg.log !== false && actionCfg.action !== 'dm') {
-          await logStrikePunishment(message.guild, member, 'سبام', sc, 'spam');
-        }
+  if (count < threshold) return;
+
+  punishingUsers.add(member.id);
+  resetUserCache(member.id);
+
+  const strikeConfig = getStrikeActionConfig('spam');
+  if (strikeConfig) {
+    const expiryMs = (strikeConfig.strikeExpiryHours || 24) * 3600000;
+    const sc = incrementStrike(member.id, 'spam', expiryMs);
+    const levelKey = `strike${Math.min(sc, 3)}`;
+    const actionCfg = strikeConfig[levelKey] || strikeConfig.strike3;
+    if (actionCfg) {
+      const reason = `سبام (إنذار ${sc})`;
+      if (actionCfg.action === 'dm') {
+        await sendStrikeDm(member, 'سبام', sc, 'spam');
+      } else if (actionCfg.action === 'timeout') {
+        await member.timeout((actionCfg.timeoutMinutes || 10) * 60000, reason).catch(() => {});
+      } else if (actionCfg.action === 'ban') {
+        await message.guild.bans.create(member, { reason, deleteMessageSeconds: 3600 }).catch(() => {});
       }
-    } else {
-      await timeoutOnly(member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 600000);
+      if (actionCfg.log !== false && actionCfg.action !== 'dm') {
+        await logStrikePunishment(message.guild, member, 'سبام', sc, 'spam');
+      }
     }
-    const lockMs = getAntiNukeConfig().punishLockMs || 30000;
-    setTimeout(() => {
-      punishingUsers.delete(member.id);
-    }, lockMs);
+  } else {
+    await member.timeout(600000, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`).catch(() => {});
+    await logPunishment(message.guild, member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 0, false);
   }
+
+  const lockMs = getAntiNukeConfig().punishLockMs || 30000;
+  setTimeout(() => { punishingUsers.delete(member.id); }, lockMs);
 }
 
 export async function unbanAll(guild, modUser) {
@@ -1011,6 +1066,20 @@ export function resetAllCache() {
   actionCache.clear();
   userSuspicion.clear();
   escalatedExceptions.clear();
+}
+
+export function resetStrikes(memberId, actionType) {
+  const key = `${memberId}_${actionType}`;
+  if (strikeRecords.has(key)) {
+    strikeRecords.delete(key);
+    saveStrikes();
+  }
+}
+
+export function getStrikeCount(memberId, actionType) {
+  const rec = getStrikes().get(`${memberId}_${actionType}`);
+  if (!rec || rec.expiryAt < Date.now()) return 0;
+  return rec.strikeCount;
 }
 
 export function getSuspicionData(userId) {

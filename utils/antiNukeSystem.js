@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { EmbedBuilder, AuditLogEvent, PermissionFlagsBits } from 'discord.js';
+import Strike from '../models/Strike.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -401,6 +402,84 @@ function getSuspicionLevel(score) {
   return null;
 }
 
+function getStrikeActionConfig(actionType) {
+  const antiNuke = getAntiNukeConfig();
+  const strikes = antiNuke.strikes;
+  if (!strikes || strikes.enabled === false) return null;
+  return strikes.actions?.[actionType] || null;
+}
+
+const STRIKE_ACTION_NAMES = {
+  mass_mention: 'المنشن الجماعي',
+  spam: 'السبام',
+  role_edit: 'تعديل الرتب',
+  role_delete: 'حذف الرتب',
+  role_create: 'إنشاء الرتب',
+  channel_delete: 'حذف الرومات',
+  channel_create: 'إنشاء الرومات',
+  channel_update: 'تعديل الرومات',
+  webhook_create: 'إنشاء ويب هوك',
+  ban: 'باند',
+  unban: 'فك باند',
+  kick: 'كيك',
+  timeout: 'تايم آوت',
+  message_delete: 'حذف رسائل',
+  bulk_delete: 'حذف جماعي',
+  emoji_create: 'إنشاء إيموجي',
+  emoji_update: 'تعديل إيموجي',
+  emoji_delete: 'حذف إيموجي',
+  sticker_create: 'إنشاء ستيكر',
+  sticker_delete: 'حذف ستيكر',
+  thread_delete: 'حذف ثريد',
+  guild_update: 'تعديل السيرفر',
+};
+
+async function sendStrikeDm(member, reasonBase, strikeCount, actionType) {
+  if (!member) return;
+  try {
+    const name = STRIKE_ACTION_NAMES[actionType] || actionType;
+    await member.send({
+      embeds: [new EmbedBuilder()
+        .setTitle(`⚠️ إنذار ${strikeCount} - ${name}`)
+        .setDescription(
+          `عزيزي ${member.user.tag}،\n\n` +
+          `نود تنبيهك أنه تم رصد تكرار **${name}** من قبلك بشكل غير مسموح به.\n` +
+          (strikeCount === 1
+            ? 'هذا إنذار أول — يرجى التوقف عن هذا السلوك.\n'
+            : 'هذا تكرار للسلوك المخالف — يرجى التوقف فوراً.\n') +
+          `إذا استمر التكرار، سيتم اتخاذ إجراءات أشد بحقك.`
+        )
+        .setColor(0xF39C12)
+        .setTimestamp()
+      ]
+    }).catch(() => {});
+  } catch {}
+}
+
+async function logStrikePunishment(guild, member, reasonBase, strikeCount, actionType) {
+  try {
+    const antiNuke = getAntiNukeConfig();
+    const channelId = antiNuke.logChannelId;
+    if (!channelId) return;
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel) return;
+
+    const name = STRIKE_ACTION_NAMES[actionType] || actionType;
+    const embed = new EmbedBuilder()
+      .setTitle(`⚠️ إنذار #${strikeCount} - ${name}`)
+      .setColor(0xF39C12)
+      .addFields(
+        { name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true },
+        { name: 'الإجراء', value: reasonBase, inline: true },
+        { name: 'عدد الإنذارات', value: `${strikeCount}`, inline: true },
+        { name: 'التوقيت', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+      )
+      .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+      .setTimestamp();
+    await channel.send({ embeds: [embed] });
+  } catch {}
+}
+
 async function checkAndPunish(member, guild, actionType, threshold, reasonBase, windowMs = 60000) {
   if (!member || punishingUsers.has(member.id)) return;
 
@@ -477,16 +556,42 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
         );
       }
     } else {
-      if (await hasAdminRoles(member)) {
-        await punishRemoveAdminRoles(member, guild,
-          `${reasonBase} (${count}) - سحب صلاحيات إدارية - Anti Nuke`,
-          suspicionScore
-        );
+      const strikeConfig = getStrikeActionConfig(actionType);
+      if (strikeConfig) {
+        const expiryMs = (strikeConfig.strikeExpiryHours || 24) * 3600000;
+        const strike = await Strike.increment(member.id, actionType, guild.id, expiryMs);
+        const sc = strike.strikeCount;
+        const levelKey = `strike${Math.min(sc, 3)}`;
+        const actionCfg = strikeConfig[levelKey] || strikeConfig.strike3;
+
+        if (actionCfg) {
+          if (actionCfg.action === 'dm') {
+            await sendStrikeDm(member, reasonBase, sc, actionType);
+          } else if (actionCfg.action === 'timeout') {
+            const dur = (actionCfg.timeoutMinutes || 10) * 60000;
+            await timeoutOnly(member, `${reasonBase} (إنذار ${sc})`, dur);
+          } else if (actionCfg.action === 'strip_admin') {
+            await punishRemoveAdminRoles(member, guild, `${reasonBase} (إنذار ${sc})`, suspicionScore);
+          } else if (actionCfg.action === 'ban') {
+            await instantBan(member, guild, `${reasonBase} (إنذار ${sc})`, suspicionScore);
+          }
+
+          if (actionCfg.log !== false && (actionCfg.action === 'timeout' || actionCfg.action === 'strip_admin' || actionCfg.action === 'ban')) {
+            await logStrikePunishment(guild, member, reasonBase, sc, actionType);
+          }
+        }
       } else {
-        const durationStr = windowMs === 10000 ? '10 ثواني' : (windowMs === 3000 ? '3 ثواني' : 'دقيقة');
-        await punishMember(member, guild,
-          `${reasonBase} (${count} مرة خلال ${durationStr}) - Anti Nuke`
-        );
+        if (await hasAdminRoles(member)) {
+          await punishRemoveAdminRoles(member, guild,
+            `${reasonBase} (${count}) - سحب صلاحيات إدارية - Anti Nuke`,
+            suspicionScore
+          );
+        } else {
+          const durationStr = windowMs === 10000 ? '10 ثواني' : (windowMs === 3000 ? '3 ثواني' : 'دقيقة');
+          await punishMember(member, guild,
+            `${reasonBase} (${count} مرة خلال ${durationStr}) - Anti Nuke`
+          );
+        }
       }
     }
   } catch (e) {
@@ -848,7 +953,29 @@ export async function handleSpam(message) {
     punishingUsers.add(member.id);
     resetUserCache(member.id);
     await message.delete().catch(() => {});
-    await timeoutOnly(member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 600000);
+    const strikeConfig = getStrikeActionConfig('spam');
+    if (strikeConfig) {
+      const expiryMs = (strikeConfig.strikeExpiryHours || 24) * 3600000;
+      const strike = await Strike.increment(member.id, 'spam', message.guild.id, expiryMs);
+      const sc = strike.strikeCount;
+      const levelKey = `strike${Math.min(sc, 3)}`;
+      const actionCfg = strikeConfig[levelKey] || strikeConfig.strike3;
+      if (actionCfg) {
+        if (actionCfg.action === 'dm') {
+          await sendStrikeDm(member, 'سبام', sc, 'spam');
+        } else if (actionCfg.action === 'timeout') {
+          const dur = (actionCfg.timeoutMinutes || 10) * 60000;
+          await timeoutOnly(member, `سبام (إنذار ${sc})`, dur);
+        } else if (actionCfg.action === 'ban') {
+          await instantBan(member, message.guild, `سبام (إنذار ${sc})`);
+        }
+        if (actionCfg.log !== false && actionCfg.action !== 'dm') {
+          await logStrikePunishment(message.guild, member, 'سبام', sc, 'spam');
+        }
+      }
+    } else {
+      await timeoutOnly(member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 600000);
+    }
     const lockMs = getAntiNukeConfig().punishLockMs || 30000;
     setTimeout(() => {
       punishingUsers.delete(member.id);

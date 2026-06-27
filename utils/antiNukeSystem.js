@@ -999,8 +999,10 @@ export async function handleSpam(message) {
   }
   if (!member) return;
 
-  await message.delete().catch(() => {});
-  if (punishingUsers.has(member.id)) return;
+  if (punishingUsers.has(member.id)) {
+    await message.delete().catch(() => {});
+    return;
+  }
 
   const count = recordAction(member.id, 'spam', 3000);
   const antiNuke = getAntiNukeConfig();
@@ -1009,6 +1011,7 @@ export async function handleSpam(message) {
 
   punishingUsers.add(member.id);
   resetUserCache(member.id);
+  await message.delete().catch(() => {});
 
   const strikeConfig = getStrikeActionConfig('spam');
   if (strikeConfig) {

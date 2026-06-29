@@ -1052,122 +1052,51 @@
     "strikes": {
       "_label": "نظام الإنذارات التدريجي (Strikes)",
       "enabled": true,
-      "strikeExpiryHours": 24,
-      "actions": {
-        "mass_mention": {
-          "strikeExpiryHours": 24,
+      "categories": {
+        "_label": "مستويات العقوبات",
+        "low": {
+          "_label": "🟢 بسيط — سبام، منشن، إيموجي، رسائل",
           "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+          "strike2": { "action": "timeout", "timeoutMinutes": 10, "log": true },
+          "strike3": { "action": "timeout", "timeoutMinutes": 60, "log": true }
         },
-        "spam": {
-          "strikeExpiryHours": 24,
+        "medium": {
+          "_label": "🟡 متوسط — رتب، رومات، تايم آوت، فك باند",
           "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+          "strike2": { "action": "strip_admin", "timeoutMinutes": 30, "log": true },
+          "strike3": { "action": "ban", "log": true }
         },
-        "role_edit": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "role_delete": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "role_create": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "channel_delete": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "channel_create": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "channel_update": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "webhook_create": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "ban": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "kick": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "timeout": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "emoji_create": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "emoji_update": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "emoji_delete": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "sticker_create": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "sticker_delete": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "thread_delete": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
-        },
-        "guild_update": {
-          "strikeExpiryHours": 24,
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
-          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        "critical": {
+          "_label": "🔴 خطير — حذف رتب/رومات، باند، ويب هوك، كيك",
+          "strike1": { "action": "strip_admin", "timeoutMinutes": 60, "log": true },
+          "strike2": { "action": "ban", "log": true },
+          "strike3": { "action": "ban", "log": true }
         }
+      },
+      "mapping": {
+        "mass_mention": "low",
+        "spam": "low",
+        "message_delete": "low",
+        "bulk_delete": "low",
+        "emoji_create": "low",
+        "emoji_update": "low",
+        "emoji_delete": "low",
+        "sticker_create": "low",
+        "sticker_delete": "low",
+        "thread_delete": "low",
+        "guild_update": "low",
+        "bot_add": "low",
+        "role_edit": "medium",
+        "role_create": "medium",
+        "channel_update": "medium",
+        "unban": "medium",
+        "timeout": "medium",
+        "role_delete": "critical",
+        "channel_delete": "critical",
+        "channel_create": "critical",
+        "ban": "critical",
+        "kick": "critical",
+        "webhook_create": "critical"
       }
     },
     "backup": {

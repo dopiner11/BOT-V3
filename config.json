@@ -1065,6 +1065,108 @@
           "strike1": { "action": "dm", "log": false },
           "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
           "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "role_edit": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "role_delete": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "role_create": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "channel_delete": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "channel_create": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "channel_update": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "webhook_create": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "ban": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "kick": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "timeout": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "emoji_create": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "emoji_update": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "emoji_delete": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "sticker_create": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "sticker_delete": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "thread_delete": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
+        },
+        "guild_update": {
+          "strikeExpiryHours": 24,
+          "strike1": { "action": "dm", "log": false },
+          "strike2": { "action": "timeout", "log": true, "timeoutMinutes": 30 },
+          "strike3": { "action": "strip_admin", "log": true, "timeoutMinutes": 60 }
         }
       }
     },

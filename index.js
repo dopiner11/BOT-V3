@@ -556,12 +556,11 @@ client.on(Events.MessageCreate, async (message) => {
     console.error('Error handling excuse message:', e);
   }
   try {
-    const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-    if (config.antiNuke?.enabled) {
+    if (isNukeEnabled()) {
       await handleMassMention(message);
       await handleSpam(message);
     }
-  } catch {}
+  } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
 /* ===================================================================

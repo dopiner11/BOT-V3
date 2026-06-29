@@ -584,7 +584,7 @@ async function logStrikePunishment(guild, member, reasonBase, strikeCount, actio
 }
 
 async function checkAndPunish(member, guild, actionType, threshold, reasonBase, windowMs = 60000) {
-  if (!member || punishingUsers.has(member.id)) return;
+  if (!member || punishingUsers.has(member.id)) return false;
 
   const config = loadConfig();
   const exemption = getExemptionLevel(member, config);
@@ -597,13 +597,15 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
   }
 
   const count = recordAction(member.id, actionType, windowMs);
-  if (count < effectiveThreshold) return;
+  if (count < effectiveThreshold) return false;
 
   punishingUsers.add(member.id);
   resetUserCache(member.id);
 
   const suspicionScore = calculateSuspicion(member.id, actionType);
   const suspicionLevel = getSuspicionLevel(suspicionScore);
+
+  let punished = false;
 
   try {
     if (exemption) {
@@ -615,6 +617,7 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
           `اختراق حساب مستثنى (${exemption}) - ${reasonBase} (${count}) - ${suspicionScore >= 60 ? 'مؤشر اختراق عالي' : 'تكرار بعد العقاب'} - Anti Nuke`,
           suspicionScore
         );
+        punished = true;
       } else {
         if (await hasAdminRoles(member)) {
           await punishRemoveAdminRoles(member, guild,
@@ -626,6 +629,7 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
             `استثناء (${exemption}) - ${reasonBase} (${count}) - Anti Nuke`
           );
         }
+        punished = true;
 
         if (escalateToBan) {
           escalatedExceptions.set(member.id, { timestamp: Date.now() });
@@ -658,6 +662,7 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
           suspicionScore
         );
       }
+      punished = true;
     } else {
       const strikeConfig = getStrikeActionConfig(actionType);
       if (strikeConfig) {
@@ -672,12 +677,15 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
             await sendStrikeDm(member, reasonBase, sc, actionType);
           } else if (actionCfg.action === 'timeout') {
             await member.timeout((actionCfg.timeoutMinutes || 10) * 60000, reason).catch(() => {});
+            punished = true;
           } else if (actionCfg.action === 'strip_admin') {
             await removeAdminRoles(member, reason);
             await new Promise(r => setTimeout(r, 500));
             await member.timeout(3600000, reason).catch(() => {});
+            punished = true;
           } else if (actionCfg.action === 'ban') {
             await guild.bans.create(member, { reason, deleteMessageSeconds: 3600 }).catch(() => {});
+            punished = true;
           }
 
           if (actionCfg.log !== false && actionCfg.action !== 'dm') {
@@ -696,6 +704,7 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
             `${reasonBase} (${count} مرة خلال ${durationStr}) - Anti Nuke`
           );
         }
+        punished = true;
       }
     }
   } catch (e) {
@@ -706,6 +715,8 @@ async function checkAndPunish(member, guild, actionType, threshold, reasonBase, 
   setTimeout(() => {
     punishingUsers.delete(member.id);
   }, lockMs);
+
+  return punished;
 }
 
 export async function handleGuildRoleUpdate(oldRole, newRole) {
@@ -1026,6 +1037,9 @@ export async function handleMassMention(message) {
   }
   if (!member) return;
 
+  const config = loadConfig();
+  if (getExemptionLevel(member, config)) return;
+
   const hasEveryone = message.mentions.everyone;
   const roleCount = message.mentions.roles.size;
   const userMentionCount = message.mentions.users.size;
@@ -1039,9 +1053,11 @@ export async function handleMassMention(message) {
   const mentionThreshold = antiNuke.mentionThreshold || 5;
   if (weight < mentionThreshold) return;
 
-  await message.delete().catch(() => {});
   const repeatThreshold = antiNuke.mentionRepeatThreshold || 2;
-  await checkAndPunish(member, message.guild, 'mass_mention', repeatThreshold, 'منشن جماعي متكرر');
+  const punished = await checkAndPunish(member, message.guild, 'mass_mention', repeatThreshold, 'منشن جماعي متكرر');
+  if (punished) {
+    await message.delete().catch(() => {});
+  }
 }
 
 export async function handleSpam(message) {
@@ -1063,41 +1079,12 @@ export async function handleSpam(message) {
     return;
   }
 
-  const count = recordAction(member.id, 'spam', 3000);
   const antiNuke = getAntiNukeConfig();
   const threshold = antiNuke.spamThreshold || 5;
-  if (count < threshold) return;
-
-  punishingUsers.add(member.id);
-  resetUserCache(member.id);
-  await message.delete().catch(() => {});
-
-  const strikeConfig = getStrikeActionConfig('spam');
-  if (strikeConfig) {
-    const expiryMs = (strikeConfig.strikeExpiryHours || 24) * 3600000;
-    const sc = incrementStrike(member.id, 'spam', expiryMs);
-    const levelKey = `strike${Math.min(sc, 3)}`;
-    const actionCfg = strikeConfig[levelKey] || strikeConfig.strike3;
-    if (actionCfg) {
-      const reason = `سبام (إنذار ${sc})`;
-      if (actionCfg.action === 'dm') {
-        await sendStrikeDm(member, 'سبام', sc, 'spam');
-      } else if (actionCfg.action === 'timeout') {
-        await member.timeout((actionCfg.timeoutMinutes || 10) * 60000, reason).catch(() => {});
-      } else if (actionCfg.action === 'ban') {
-        await message.guild.bans.create(member, { reason, deleteMessageSeconds: 3600 }).catch(() => {});
-      }
-      if (actionCfg.log !== false && actionCfg.action !== 'dm') {
-        await logStrikePunishment(message.guild, member, 'سبام', sc, 'spam');
-      }
-    }
-  } else {
-    await member.timeout(600000, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`).catch(() => {});
-    await logPunishment(message.guild, member, `سبام (${count} رسالة خلال 3 ثواني) - Anti Nuke`, 0, false);
+  const punished = await checkAndPunish(member, message.guild, 'spam', threshold, 'سبام متكرر', 3000);
+  if (punished) {
+    await message.delete().catch(() => {});
   }
-
-  const lockMs = getAntiNukeConfig().punishLockMs || 30000;
-  setTimeout(() => { punishingUsers.delete(member.id); }, lockMs);
 }
 
 export async function unbanAll(guild, modUser) {

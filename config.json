@@ -1003,6 +1003,7 @@
       }
     ]
   },
+  "antiNukeProtection": true,
   "antiNuke": {
     "_label": "🛡️ نظام الحماية المتطور - Anti Nuke",
     "enabled": true,

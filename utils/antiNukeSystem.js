@@ -1138,7 +1138,9 @@ export async function unbanAll(guild, modUser) {
 }
 
 export function isNukeEnabled() {
-  return getAntiNukeConfig().enabled === true;
+  const config = loadConfig();
+  if (config.antiNukeProtection !== undefined) return config.antiNukeProtection === true;
+  return (config.antiNuke && config.antiNuke.enabled) === true;
 }
 
 export function resetUserCache(userId) {

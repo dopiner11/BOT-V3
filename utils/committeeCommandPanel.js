@@ -144,7 +144,6 @@ const COMMANDS_MAP = {
         { name: 'الصورة', label: 'رابط الصورة (اختياري)', type: 'string', placeholder: 'https://...', required: false },
       ] },
     { action: 'نظام-التقارير', module: 'reportSystem.js', label: 'نظام التقارير', emoji: '📋', elevated: false, noParams: true },
-    { action: 'تقارير', module: 'reports.js', label: 'تحديث التقارير', emoji: '📊', elevated: false, noParams: true },
     { action: 'التقديم', module: 'application.js', label: 'تقديم', emoji: '📨', elevated: false, noParams: true },
     { action: 'حضور', module: 'attendance.js', label: 'حضور', emoji: '🎮', elevated: false, noParams: true },
     { action: 'مراجعة_التفاعل', module: null, label: 'مراجعة التفاعل', emoji: '🔍', elevated: false, noParams: true, internal: true },
@@ -262,7 +261,6 @@ const COMMANDS_MAP = {
         { name: 'السبب', label: 'السبب', type: 'string', placeholder: 'سبب الزيادة', required: true, style: 'short' },
       ] },
     { action: 'نظام-التقارير', module: 'reportSystem.js', label: 'نظام التقارير', emoji: '📋', elevated: false, noParams: true },
-    { action: 'تقارير', module: 'reports.js', label: 'تحديث التقارير', emoji: '📊', elevated: false, noParams: true },
     { action: 'حضور', module: 'attendance.js', label: 'حضور', emoji: '🎮', elevated: false, noParams: true },
     { action: 'تنويه', module: 'announcement.js', label: 'تنويه', emoji: '📢', elevated: false,
       params: [

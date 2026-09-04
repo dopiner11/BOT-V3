@@ -274,13 +274,6 @@ export const commandRegistry = {
     description: 'إرسال لوحة إنشاء التقارير',
     usage: '/نظام-التقارير',
   },
-  'تقارير': {
-    category: 'reports',
-    committee: 'interaction',
-    action: 'reports',
-    description: 'تحديث لوحة التقارير المباشرة',
-    usage: '/تقارير',
-  },
 
   // ===== أوامر المعلومات =====
   'معلومات': {

@@ -12,6 +12,11 @@ let cachedConfig = null;
 let cacheTime = 0;
 const CACHE_TTL = 5000;
 
+export function clearConfigCache() {
+  cachedConfig = null;
+  cacheTime = 0;
+}
+
 export function loadConfig(forceRefresh = false) {
   const now = Date.now();
   if (!forceRefresh && cachedConfig && (now - cacheTime) < CACHE_TTL) {

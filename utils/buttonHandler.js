@@ -231,7 +231,7 @@ export async function handleButtonInteraction(interaction) {
             await interaction.deferUpdate();
             const { StringSelectMenuBuilder } = await import('discord.js');
 
-            const oldMenu = interaction.message.components[0].components[0];
+            const oldMenu = interaction.message.components[0]?.components[0];
             if (!oldMenu) return;
 
             // جلب نفس الـ embed من الرسالة الأصلية

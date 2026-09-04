@@ -100,9 +100,11 @@ export default {
           if (gm) {
             // 1. استعادة الاسم المستعار إن اختلف
             const expectedNickname = `IQ • ${memberRec.gameName} X.IRAQ 〢${memberRec.gameId}`;
+            let hadNicknameChange = false;
             if (gm.nickname !== expectedNickname) {
               await gm.setNickname(expectedNickname).catch(() => {});
               nicknamesRestored++;
+              hadNicknameChange = true;
             }
 
             // 2. فحص وإضافة الرتب الناقصة
@@ -123,7 +125,8 @@ export default {
             }
 
             const uniqueRoles = [...new Set(rolesToAdd.filter(Boolean))];
-            if (uniqueRoles.length > 0) {
+            const addedRolesCount = uniqueRoles.length;
+            if (addedRolesCount > 0) {
               await gm.roles.add(uniqueRoles).catch(() => {});
               rolesRestored++;
             }
@@ -138,13 +141,20 @@ export default {
                 }).catch(() => {});
               }
             }
-          }
 
-          // حفظ التعديلات في قاعدة البيانات
-          await memberRec.save();
+            // حفظ التعديلات في قاعدة البيانات
+            await memberRec.save();
 
-          if (roomNeedsCreation || (gm && (rolesRestored > 0 || nicknamesRestored > 0))) {
-            detailsList.push(`• **${memberRec.gameName || 'عضو'}** (<@${memberRec.discordId}>) - تم فحص رتبه وصيانة رومه`);
+            const memberHadChanges = roomNeedsCreation || addedRolesCount > 0 || hadNicknameChange;
+            if (memberHadChanges) {
+              detailsList.push(`• **${memberRec.gameName || 'عضو'}** (<@${memberRec.discordId}>) - تم فحص رتبه وصيانة رومه`);
+            }
+          } else {
+            // العضو غير متواجد في السيرفر — احفظ تغييرات الروم فقط إن وجدت
+            await memberRec.save();
+            if (roomNeedsCreation) {
+              detailsList.push(`• **${memberRec.gameName || 'عضو'}** (<@${memberRec.discordId}>) - تم إنشاء رومه` );
+            }
           }
         } catch (err) {
           console.error(`Error restoring member ${memberRec.discordId}:`, err);

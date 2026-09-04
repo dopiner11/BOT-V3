@@ -1009,8 +1009,19 @@
     "enabled": true,
     "logChannelId": "1390328692148015205",
     "bypassRoleIds": ["1388879998739288154","1390306526136373312"],
-    "exceptionMultiplier": 4,
+    "exceptionMultiplier": 2,
     "exceptionEscalateToBan": true,
+    "exemption": {
+      "_label": "سلوك المستثنيين (founders / authorizedUsers / رتب bypass) في نظام الحماية",
+      "punishOnDestructive": true,
+      "_label_punishOnDestructive": "يحاسبهم لو يكررون التخريب الفعلي (باند/حذف رومات/حذف رتب/تغيير أسماء...) — الاستثناء مجرد راحة للعمل العادي مش حصانة",
+      "multiplier": 2,
+      "_label_multiplier": "كم مرة عتبة أطول قبل ما يُحاسب (2 = ضعف عتبة العضو العادي)",
+      "requireStrike": true,
+      "_label_requireStrike": "يمر عبر نظام الإنذارات التدريجي كما الأعضاء (إنذار → تايم آوت → باند/سحب)",
+      "escalateToBan": true,
+      "_label_escalateToBan": "عند الإنذار الثالث منه → باند أو سحب صلاحيات حسب نوع التخريب"
+    },
     "escalationCooldownMs": 300000,
     "auditLogFetchLimit": 10,
     "cacheConfigIntervalMs": 30000,
@@ -1106,6 +1117,39 @@
       "autoRestore": true,
       "intervalMinutes": 60,
       "maxBackups": 5
+    },
+    "windows": {
+      "_label": "مدة النافذة لكل نوع نشاط (مللي ثانية) — المدة اللي يتراكم فيها عدد العمليات قبل ما يُصفّر",
+      "default": 600000,
+      "_label_default": "10 دقائق الافتراضي لكل العمليات الخطيرة",
+      "role_edit": 600000,
+      "role_delete": 600000,
+      "role_create": 600000,
+      "channel_delete": 600000,
+      "channel_create": 600000,
+      "channel_update": 600000,
+      "ban": 600000,
+      "unban": 600000,
+      "kick": 600000,
+      "timeout": 600000,
+      "webhook_create": 600000,
+      "message_delete": 600000,
+      "bulk_delete": 600000,
+      "emoji_create": 600000,
+      "emoji_update": 600000,
+      "emoji_delete": 600000,
+      "sticker_create": 600000,
+      "sticker_delete": 600000,
+      "thread_delete": 600000,
+      "guild_update": 600000,
+      "bot_add": 600000,
+      "mass_mention": 60000,
+      "spam": 30000
+    },
+    "scaling": {
+      "_label": "نظام المراقبة المشددة — لما تتجاوز العمليات نسبة معينة من العتبة، يسجل تنبيه مراقبة بدون عقوبة فورية",
+      "enabled": true,
+      "fraction": 0.6
     }
   }
 }

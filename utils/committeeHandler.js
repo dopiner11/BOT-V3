@@ -6,12 +6,13 @@ import { commandRegistry, getCommandInfo, getButtonInfo, getModalInfo } from './
 import { committees as permCommittees, getCommitteesForCommand, getCommitteesForButton, isElevatedCommand, isElevatedButton } from './committeePermissions.js';
 import PersistentMessage from '../models/PersistentMessage.js';
 import { info as embedInfo, gold as embedGold, custom as embedCustom } from './embedStyles.js';
-import { loadConfig } from './configLoader.js';
+import { loadConfig, clearConfigCache } from './configLoader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const committeeDataPath = join(__dirname, '../.data/Committees.json');
+const configPath = join(__dirname, '../config.json');
 
 const COMMITTEE_COLORS = {
   punishment: 0xE74C3C,
@@ -48,7 +49,7 @@ function saveConfig(config) {
         const toSave = JSON.parse(JSON.stringify(config));
         if (toSave.committees) delete toSave.committees.list;
         writeFileSync(configPath, JSON.stringify(toSave, null, 2), 'utf8');
-        cachedConfig = null;
+        clearConfigCache();
     } catch (err) {
         console.error('❌ Failed to save config.json', err);
     }
@@ -61,7 +62,7 @@ async function findCommitteeByInteraction(interaction, config) {
       const pMsg = await PersistentMessage.findOne({ messageId: interaction.message.id });
       if (pMsg) {
         const key = pMsg.key.replace('committeePanel_', '');
-        const committee = config.committees.list[key];
+        const committee = config.committees?.list?.[key];
         if (committee) return [key, committee];
       }
     } catch (e) {
@@ -70,7 +71,8 @@ async function findCommitteeByInteraction(interaction, config) {
   }
 
   // 2. Try by channelId or threadId directly
-  const directMatch = Object.entries(config.committees.list).find(([k, v]) =>
+  const committeeList = config.committees?.list || {};
+  const directMatch = Object.entries(committeeList).find(([k, v]) =>
     v.channelId === interaction.channelId || v.threadId === interaction.channelId
   );
   if (directMatch) return directMatch;
@@ -80,7 +82,7 @@ async function findCommitteeByInteraction(interaction, config) {
   if (channel) {
     const parentId = channel.parentId || channel.parent?.id;
     if (parentId) {
-      const parentMatch = Object.entries(config.committees.list).find(([k, v]) =>
+      const parentMatch = Object.entries(committeeList).find(([k, v]) =>
         v.channelId === parentId || v.threadId === parentId
       );
       if (parentMatch) return parentMatch;
@@ -343,7 +345,7 @@ function createCommitteeEmbed(guild, committeeKey, committee) {
 
 export async function refreshCommitteePanel(guild, committeeKey) {
     const config = loadConfig();
-    const committee = config.committees.list[committeeKey];
+    const committee = config.committees?.list?.[committeeKey];
     if (!committee || !committee.channelId || committee.channelId.startsWith('REPLACE')) return;
 
     try {
@@ -409,7 +411,7 @@ export async function refreshAllCommitteePanels(client) {
     if (!guild) return;
 
     console.log('🔄 Started refreshing committee panels...');
-    for (const key of Object.keys(config.committees.list)) {
+    for (const key of Object.keys(config.committees?.list || {})) {
         await refreshCommitteePanel(guild, key);
         await new Promise(r => setTimeout(r, 800));
     }
@@ -508,7 +510,7 @@ async function handleAddUserIdSubmit(interaction) {
 
     // الرئاسة: يمكنها الإضافة لأي لجنة بأي منصب
     if (superCheck) {
-        const options = Object.entries(config.committees.list).map(([k, c]) => ({ label: c.name, value: k }));
+        const options = Object.entries(config.committees?.list || {}).map(([k, c]) => ({ label: c.name, value: k }));
         const row = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`comm_sel_dept_${targetId}`).setPlaceholder('اختر اللجنة').addOptions(options));
         return await interaction.editReply({ content: `👤 <@${targetId}>\n**اختر اللجنة المُراد الإضافة إليها:**`, components: [row] }).catch(() => { });
     }
@@ -549,7 +551,7 @@ async function handleCommitteeSelection(interaction) {
     const options = selectedKey === 'family_presidency' ? [{ label: 'عضو رئاسة', value: 'member' }] :
         [{ label: 'مسؤول لجنة', value: 'manager' }, { label: 'نائب مسؤول', value: 'deputy' }, { label: 'عضو لجنة', value: 'member' }];
     const row = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`comm_sel_pos_${targetId}_${selectedKey}`).setPlaceholder('المنصب').addOptions(options));
-    await interaction.editReply({ content: `👤 <@${targetId}>\nاللجنة: **${config.committees.list[selectedKey].name}**`, components: [row] }).catch(() => { });
+    await interaction.editReply({ content: `👤 <@${targetId}>\nاللجنة: **${config.committees?.list?.[selectedKey]?.name || selectedKey}**`, components: [row] }).catch(() => { });
 }
 
 async function handlePositionSelection(interaction) {
@@ -578,7 +580,7 @@ async function handlePositionSelection(interaction) {
         return interaction.editReply({ content: '❌ المؤسسون أو المصرح لهم فقط يمكنهم التعديل على الرئاسة.', components: [] }).catch(() => { });
     }
 
-    const committee = config.committees.list[commKey];
+    const committee = config.committees?.list?.[commKey];
     if (!committee) return interaction.editReply({ content: `❌ خطأ في التعرف على اللجنة: ${commKey}`, components: [] }).catch(() => { });
 
     if (!committee.roles) committee.roles = {};

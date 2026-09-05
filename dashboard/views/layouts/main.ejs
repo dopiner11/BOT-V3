@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title ? title + ' — ' : '' %><%= dashConfig.ui.brand %></title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+    <% if (user) { %>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-emoji"><%= dashConfig.ui.accentEmoji %></span>
+        <div class="brand-text">
+          <strong><%= dashConfig.ui.brand %></strong>
+          <small>لوحة التحكم</small>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="/" class="<%= active === 'dashboard' ? 'active' : '' %>">📊 لوحة التحكم</a>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('bot.view')) { %>
+        <a href="/bot" class="<%= active === 'bot' ? 'active' : '' %>">🤖 التحكم بالبوت</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('config.view')) { %>
+        <a href="/config" class="<%= active === 'config' ? 'active' : '' %>">⚙️ ملف الإعدادات</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('channels.view')) { %>
+        <a href="/channels" class="<%= active === 'channels' ? 'active' : '' %>"># الرومات والقنوات</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('roles.view')) { %>
+        <a href="/roles" class="<%= active === 'roles' ? 'active' : '' %>">🎭 الرولات</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('members.view')) { %>
+        <a href="/members" class="<%= active === 'members' ? 'active' : '' %>">👥 الأعضاء</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('tickets.view')) { %>
+        <a href="/tickets" class="<%= active === 'tickets' ? 'active' : '' %>">🎫 التذاكر</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('blackmarket.view')) { %>
+        <a href="/blackmarket" class="<%= active === 'blackmarket' ? 'active' : '' %>">🏴 البلاك ماركت</a>
+        <% } %>
+
+        <% if (user.permissions.includes('*') || user.permissions.includes('settings.view')) { %>
+        <a href="/settings" class="<%= active === 'settings' ? 'active' : '' %>">🛠️ إعدادات الموقع</a>
+        <% } %>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout" class="logout">🚪 تسجيل الخروج</a>
+      </div>
+    </aside>
+    <% } %>
+
+    <main class="content <%= user ? '' : 'no-sidebar' %>">
+      <%- body %>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+</body>
+</html>

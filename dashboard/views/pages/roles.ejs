@@ -1,0 +1,35 @@
+<div class="page-header">
+  <h1>🎭 الرولات</h1>
+  <p>كل الرتب المستخدمة في إعدادات البوت</p>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>الرولات (<%= roles.length %>)</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>التسمية</th>
+          <th>المفتاح</th>
+          <th>الآيدي</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (roles.length === 0) { %>
+        <tr><td colspan="4" class="empty">لا توجد رولات</td></tr>
+        <% } %>
+        <% roles.forEach((r, i) => { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= r.label %></td>
+          <td class="mono"><%= r.key %></td>
+          <td class="mono"><%= r.id %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

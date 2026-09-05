@@ -1,0 +1,54 @@
+<div class="page-header">
+  <h1>🏴 البلاك ماركت</h1>
+  <p>البائعين والطلبات والمنتجات</p>
+</div>
+
+<div class="stats-grid small">
+  <div class="stat-card"><div class="stat-icon">🛒</div><div class="stat-info"><span class="stat-value"><%= stats.sellers %></span><span class="stat-label">البائعون</span></div></div>
+  <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-info"><span class="stat-value"><%= stats.orders %></span><span class="stat-label">الطلبات</span></div></div>
+  <div class="stat-card"><div class="stat-icon">🏷️</div><div class="stat-info"><span class="stat-value"><%= stats.products %></span><span class="stat-label">المنتجات</span></div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>البائعون</h2></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>#</th><th>الاسم</th><th>الحالة</th><th>المبيعات</th></tr></thead>
+      <tbody>
+        <% if (sellers.length === 0) { %>
+        <tr><td colspan="4" class="empty">لا يوجد بائعون</td></tr>
+        <% } %>
+        <% sellers.forEach((s, i) => { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= s.name || s.userName || s.discordId || '—' %></td>
+          <td><span class="badge <%= s.isApproved || s.status === 'approved' ? 'ok' : 'muted' %>"><%= s.isApproved || s.status === 'approved' ? 'معتمد' : 'قيد المراجعة' %></span></td>
+          <td><%= s.sales || s.totalSales || 0 %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>الطلبات</h2></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>#</th><th>البائع</th><th>المنتج</th><th>الحالة</th></tr></thead>
+      <tbody>
+        <% if (orders.length === 0) { %>
+        <tr><td colspan="4" class="empty">لا توجد طلبات</td></tr>
+        <% } %>
+        <% orders.forEach((o, i) => { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= o.seller || o.sellerName || '—' %></td>
+          <td><%= o.product || o.productName || '—' %></td>
+          <td><span class="badge"><%= o.status || '—' %></span></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

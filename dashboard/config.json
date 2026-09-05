@@ -1,0 +1,86 @@
+{
+  "server": {
+    "_label": "إعدادات الخادم",
+    "host": "0.0.0.0",
+    "_label_host": "العنوان الذي يستمع عليه الخادم (0.0.0.0 = كل العناوين، 127.0.0.1 = محلي فقط)",
+    "port": 3000,
+    "_label_port": "المنفذ الذي يعمل عليه الموقع",
+    "sessionSecret": "CHANGE_ME_to_a_long_random_string",
+    "_label_sessionSecret": "سر تشفير الجلسات — غيّره لسلسلة عشوائية طويلة"
+  },
+  "discord": {
+    "clientId": "1393136498760482928",
+    "_label_clientId": "Client ID من لوحة مطوري ديسكورد (تطبيقك)",
+    "clientSecret": "",
+    "_label_clientSecret": "Client Secret من لوحة مطوري ديسكورد — ضعه هنا",
+    "redirectUri": "http://localhost:3000/oauth/discord/callback",
+    "_label_redirectUri": "رابط الإعادة بعد تسجيل الدخول — يجب أن يطابق تماماً ما في لوحة المطورين",
+    "guildId": "1383643556194943108",
+    "scopes": ["identify", "guilds", "guilds.members.read"]
+  },
+  "permissions": {
+    "_label": "نظام الصلاحيات — كل رتبة من رتب السيرفر لها قائمة صلاحيات في الموقع",
+    "_label_hint": "صلاحية '*' تعني الوصول الكامل. لو العضو ليس له أي رتبة في القائمة -> يُرفض دخوله.",
+    "defaultDeniedMessage": "ما عندك صلاحية للوصول إلى هذه الصفحة.",
+    "roles": [
+      {
+        "roleId": "1389190409317646336",
+        "name": "الإدارة العليا",
+        "permissions": ["*"]
+      },
+      {
+        "roleId": "1398209740869472286",
+        "name": "رئاسة العائلة",
+        "permissions": ["bot.*", "config.*", "members.view", "stats.view", "channels.view", "roles.view", "settings.view"]
+      },
+      {
+        "roleId": "1388879998739288154",
+        "name": "إدارة البلاك ماركت",
+        "permissions": ["blackmarket.view", "blackmarket.edit", "bot.view", "stats.view"]
+      }
+    ]
+  },
+  "permissionList": {
+    "_label": "كل الصلاحيات المتاحة التي يمكن منحها لأي رتبة (للعرض في صفحة الإعدادات)",
+    "items": {
+      "*": "الوصول الكامل لكل شيء",
+      "bot.view": "عرض حالة البوت",
+      "bot.start": "تشغيل البوت",
+      "bot.stop": "إيقاف البوت",
+      "bot.restart": "إعادة تشغيل البوت",
+      "bot.log": "عرض سجل البوت",
+      "config.view": "عرض ملف الإعدادات",
+      "config.edit": "تعديل ملف الإعدادات",
+      "channels.view": "عرض الرومات",
+      "channels.edit": "تعديل الرومات",
+      "roles.view": "عرض الرولات",
+      "roles.edit": "تعديل الرولات",
+      "members.view": "عرض الأعضاء",
+      "members.edit": "إدارة الأعضاء (حظر/طرد/تحذير)",
+      "tickets.view": "عرض التذاكر",
+      "tickets.edit": "إدارة التذاكر",
+      "blackmarket.view": "عرض البلاك ماركت",
+      "blackmarket.edit": "إدارة البلاك ماركت",
+      "stats.view": "عرض الإحصائيات",
+      "settings.view": "عرض إعدادات الموقع",
+      "settings.edit": "تعديل إعدادات الموقع"
+    }
+  },
+  "ui": {
+    "_label": "إعدادات الواجهة",
+    "brand": "𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘𓆪",
+    "brandShort": "X.IRAQ",
+    "footer": "لوحة تحكم عائلة X.IRAQ",
+    "colors": {
+      "primary": "#5865F2",
+      "success": "#2ECC71",
+      "danger": "#E74C3C",
+      "warning": "#F39C12",
+      "background": "#0f1117",
+      "card": "#1a1d28",
+      "text": "#e6e8ef",
+      "muted": "#8b90a5"
+    },
+    "accentEmoji": "👑"
+  }
+}

@@ -1,0 +1,35 @@
+<div class="page-header">
+  <h1># الرومات والقنوات</h1>
+  <p>كل القنوات المستخدمة في إعدادات البوت</p>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>القنوات (<%= channels.length %>)</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>التسمية</th>
+          <th>المفتاح</th>
+          <th>الآيدي</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (channels.length === 0) { %>
+        <tr><td colspan="4" class="empty">لا توجد قنوات</td></tr>
+        <% } %>
+        <% channels.forEach((c, i) => { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= c.label %></td>
+          <td class="mono"><%= c.key %></td>
+          <td class="mono"><%= c.id %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

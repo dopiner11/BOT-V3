@@ -1,0 +1,51 @@
+<div class="page-header">
+  <h1>🤖 التحكم بالبوت</h1>
+  <p>إدارة تشغيل وإيقاف البوت وعرض السجل</p>
+</div>
+
+<div class="card">
+  <div class="bot-status-row">
+    <div class="status-dot <%= running ? 'online' : 'offline' %>"></div>
+    <div>
+      <h2 class="status-title"><%= running ? 'البوت يعمل' : 'البوت متوقف' %></h2>
+      <p class="status-meta">
+        <% if (running) { %>
+          شغال من: <span class="mono"><%= status.startedAt %></span> — PID: <span class="mono"><%= status.pid %></span>
+        <% } else if (status.lastError) { %>
+          آخر خطأ: <span class="mono"><%= status.lastError %></span>
+        <% } else { %>
+          لم يتم تشغيل البوت بعد
+        <% } %>
+      </p>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-success" id="btn-start" <%= running ? 'disabled' : '' %>>▶️ تشغيل</button>
+    <button class="btn btn-danger" id="btn-stop" <%= !running ? 'disabled' : '' %>>⏹️ إيقاف</button>
+    <button class="btn btn-warning" id="btn-restart" <%= !running ? 'disabled' : '' %>>🔄 إعادة تشغيل</button>
+    <a href="/api/bot/log/download" class="btn btn-secondary">💾 تنزيل السجل</a>
+  </div>
+  <p class="msg" id="bot-msg"></p>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>📜 سجل البوت</h2>
+    <span class="badge" id="log-count"></span>
+  </div>
+  <pre class="log-view" id="log-view"><%= log.join('\n') %></pre>
+  <div class="log-actions">
+    <button class="btn btn-secondary btn-sm" id="btn-refresh-log">🔄 تحديث السجل</button>
+    <button class="btn btn-secondary btn-sm" id="btn-clear-log">🧹 مسح العرض</button>
+  </div>
+</div>
+
+<script>
+  window.BOT_ROUTES = {
+    start: '/api/bot/start',
+    stop: '/api/bot/stop',
+    restart: '/api/bot/restart',
+    log: '/api/bot/log'
+  };
+</script>

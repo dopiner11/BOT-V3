@@ -1,0 +1,50 @@
+<div class="page-header">
+  <h1>🛠️ إعدادات الموقع</h1>
+  <p>تهيئة لوحة التحكم: الصلاحيات لكل رتبة، الخادم، والمظهر</p>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>🛡️ صلاحيات الرتب (نظام RBAC)</h2>
+    <p class="hint">كل رتبة في السيرفر لها قائمة صلاحيات في الموقع. العضو الذي ليس له رتبة هنا → يُرفض دخوله.</p>
+  </div>
+
+  <% if (canEdit) { %>
+  <div id="perm-editor" data-perm-items='<%- JSON.stringify(dashboardConfig.permissionList.items) %>'>
+    <% dashboardConfig.permissions.roles.forEach((role, idx) => { %>
+    <div class="role-perm-block">
+      <div class="role-perm-head">
+        <input type="text" class="input" value="<%= role.name %>" data-field="name" data-idx="<%= idx %>" placeholder="اسم الرتبة" />
+        <input type="text" class="input mono" value="<%= role.roleId %>" data-field="roleId" data-idx="<%= idx %>" placeholder="Role ID" />
+        <button class="btn btn-danger btn-sm" data-remove-role="<%= idx %>">🗑️</button>
+      </div>
+      <div class="perms-checks">
+        <% Object.entries(dashboardConfig.permissionList.items).forEach(([p, desc]) => { %>
+        <label class="check">
+          <input type="checkbox" class="perm-check" data-idx="<%= idx %>" value="<%= p %>"
+            <%= role.permissions.includes(p) ? 'checked' : '' %> />
+          <span><code><%= p %></code> <small><%= desc %></small></span>
+        </label>
+        <% }) %>
+      </div>
+    </div>
+    <% }) %>
+    <button class="btn btn-secondary btn-sm" id="btn-add-role">➕ إضافة رتبة</button>
+  </div>
+  <button class="btn btn-success" id="btn-save-perms">💾 حفظ الصلاحيات</button>
+  <p class="msg" id="perm-msg"></p>
+  <% } else { %>
+  <p>ليست لديك صلاحية التعديل.</p>
+  <% } %>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>⚙️ إعدادات متقدمة (JSON)</h2></div>
+  <% if (canEdit) { %>
+  <textarea id="settings-editor" class="json-editor" spellcheck="false"><%= configJson %></textarea>
+  <button class="btn btn-success btn-sm" id="btn-save-settings">💾 حفظ</button>
+  <p class="msg" id="settings-msg"></p>
+  <% } else { %>
+  <pre class="json-view"><%= configJson %></pre>
+  <% } %>
+</div>

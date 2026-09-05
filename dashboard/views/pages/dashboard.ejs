@@ -1,0 +1,76 @@
+<div class="page-header">
+  <h1>📊 لوحة التحكم الرئيسية</h1>
+  <p>نظرة عامة على حالة العائلة والبوت</p>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">🤖</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.bot.state === 'running' ? 'شغال' : 'متوقف' %></span>
+      <span class="stat-label">حالة البوت</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.members.total %></span>
+      <span class="stat-label">إجمالي الأعضاء</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">✅</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.members.active %></span>
+      <span class="stat-label">أعضاء نشطون</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">⭐</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.members.totalPoints %></span>
+      <span class="stat-label">إجمالي النقاط</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🎫</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.tickets.total %></span>
+      <span class="stat-label">التذاكر</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">⚠️</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.warnings %></span>
+      <span class="stat-label">الإنذارات</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📋</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.reports %></span>
+      <span class="stat-label">التقارير</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🗂️</div>
+    <div class="stat-info">
+      <span class="stat-value"><%= stats.collectionsCount %></span>
+      <span class="stat-label">قواعد البيانات</span>
+    </div>
+  </div>
+</div>
+
+<div class="page-header" style="margin-top: 28px;">
+  <h2>تذييل بيانات البوت</h2>
+</div>
+<div class="card">
+  <div class="user-hello">
+    <span class="avatar-md"><%= (user.global_name || user.username || '؟').charAt(0) %></span>
+    <div>
+      <strong>مرحباً، <%= user.global_name || user.username %></strong>
+      <small>دورك في اللوحة: <%= user.roleName || '—' %></small>
+    </div>
+  </div>
+</div>

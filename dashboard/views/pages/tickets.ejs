@@ -1,0 +1,40 @@
+<div class="page-header">
+  <h1>🎫 نظام التذاكر</h1>
+  <p>عرض التذاكر المفتوحة والمغلقة</p>
+</div>
+
+<div class="stats-grid small">
+  <div class="stat-card"><div class="stat-icon">🎫</div><div class="stat-info"><span class="stat-value"><%= stats.total %></span><span class="stat-label">الإجمالي</span></div></div>
+  <div class="stat-card"><div class="stat-icon">🟢</div><div class="stat-info"><span class="stat-value"><%= stats.open %></span><span class="stat-label">مفتوحة</span></div></div>
+  <div class="stat-card"><div class="stat-icon">🔒</div><div class="stat-info"><span class="stat-value"><%= stats.closed %></span><span class="stat-label">مغلقة</span></div></div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>النوع</th>
+          <th>المستخدم</th>
+          <th>الحالة</th>
+          <th>الافتتاح</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (tickets.length === 0) { %>
+        <tr><td colspan="5" class="empty">لا توجد تذاكر</td></tr>
+        <% } %>
+        <% tickets.forEach((t, i) => { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= t.type || '—' %></td>
+          <td><%= t.userName || t.userId || t.user || t.opener || '—' %></td>
+          <td><span class="badge <%= !t.closedAt && t.status !== 'closed' ? 'ok' : 'muted' %>"><%= !t.closedAt && t.status !== 'closed' ? 'مفتوحة' : 'مغلقة' %></span></td>
+          <td class="mono"><%= t.createdAt ? new Date(t.createdAt).toLocaleString() : '—' %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

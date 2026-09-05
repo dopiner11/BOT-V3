@@ -1,0 +1,45 @@
+<div class="page-header">
+  <h1>👥 إدارة الأعضاء</h1>
+  <p>عرض أعضاء العائلة ونقاطهم</p>
+</div>
+
+<div class="stats-grid small">
+  <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-info"><span class="stat-value"><%= stats.total %></span><span class="stat-label">الإجمالي</span></div></div>
+  <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-info"><span class="stat-value"><%= stats.active %></span><span class="stat-label">النشطون</span></div></div>
+  <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-info"><span class="stat-value"><%= stats.totalPoints %></span><span class="stat-label">إجمالي النقاط</span></div></div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>كل الأعضاء</h2>
+    <input type="text" id="member-search" class="search-input" placeholder="بحث بالاسم أو الآيدي..." />
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="member-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>العضو</th>
+          <th>نقاط</th>
+          <th>الحالة</th>
+          <th>آخر نشاط</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (members.length === 0) { %>
+        <tr><td colspan="5" class="empty">لا يوجد أعضاء</td></tr>
+        <% } %>
+        <% members.forEach((m, i) => { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><strong><%= m.name || m.discordName || m.username || m.discordId || '—' %></strong>
+              <% if (m.discordId) { %><div class="sub mono"><%= m.discordId %></div><% } %></td>
+          <td><span class="badge gold"><%= m.points || 0 %></span></td>
+          <td><span class="badge <%= m.isActive ? 'ok' : 'muted' %>"><%= m.isActive ? 'نشط' : 'غير نشط' %></span></td>
+          <td class="mono"><%= m.lastActivity ? new Date(m.lastActivity).toLocaleDateString() : '—' %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

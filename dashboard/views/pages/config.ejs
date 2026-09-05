@@ -1,0 +1,21 @@
+<div class="page-header">
+  <h1>⚙️ ملف الإعدادات (config.json)</h1>
+  <p>عرض وتعديل الإعدادات الرئيسية للبوت</p>
+</div>
+
+<div class="card">
+  <% if (canEdit) { %>
+  <div class="card-head">
+    <h2>محرر JSON</h2>
+    <button class="btn btn-success btn-sm" id="btn-save-config">💾 حفظ التغييرات</button>
+  </div>
+  <p class="hint">عدّل القيم ثم اضغط حفظ. سيتم إعادة تحميل الإعدادات للنظام.</p>
+  <textarea id="config-editor" class="json-editor" spellcheck="false"><%= configJson %></textarea>
+  <p class="msg" id="config-msg"></p>
+  <% } else { %>
+  <div class="card-head">
+    <h2>عرض JSON (قراءة فقط)</h2>
+  </div>
+  <pre class="json-view"><%= configJson %></pre>
+  <% } %>
+</div>

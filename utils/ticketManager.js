@@ -84,8 +84,12 @@ export async function createTicket(guild, userId, type = 'application') {
 
     // التحقق من وجود فئة التذاكر (الأولوية: الفئة الخاصة بالنوع > الفئة العامة للنظام > الفئة العامة في categories)
     const categoryId = ticketConfig?.categoryId || config.ticketSystem?.categoryId || config.general?.categories?.tickets?.id;
-    const category = guild.channels.cache.get(categoryId);
-    if (!category) {
+    // نجرب من الكاش أولاً، وإذا ما طلعت نجلبه من الـ API (الكاش ما يغطي الروحات اللي تزيد عن 2500)
+    let category = guild.channels.cache.get(categoryId);
+    if (!category && categoryId) {
+      category = await guild.channels.fetch(categoryId).catch(() => null);
+    }
+    if (!category || category.type !== ChannelType.GuildCategory) {
       throw new Error(`❌ فئة التذاكر غير موجودة أو غير صحيحة (ID: ${categoryId})`);
     }
 
@@ -1159,7 +1163,11 @@ export async function processFinishApplication(interaction, ticketNumber, discor
 async function createMemberRoom(guild, discordId, characterName, gameId, levelCategory) {
   try {
     const config = loadConfig();
-    const category = guild.channels.cache.get(config.general?.categories?.memberRooms?.id);
+    const categoryId = config.general?.categories?.memberRooms?.id;
+    let category = guild.channels.cache.get(categoryId);
+    if (!category && categoryId) {
+      category = await guild.channels.fetch(categoryId).catch(() => null);
+    }
     if (!category) {
       throw new Error('❌ فئة غرف الأعضاء غير موجودة في الإعدادات');
     }

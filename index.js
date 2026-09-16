@@ -61,8 +61,6 @@ import {
   handleWebhookCreate,
   isNukeEnabled,
 } from './utils/antiNukeSystem.js';
-import { handlePermissionSystemInteraction, restoreActiveSessions } from './utils/permissionSystem.js';
-import { isWelcomeEnabled, applyWelcome, setNicknameRobust } from './utils/memberWelcome.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -117,26 +115,16 @@ async function ensureVoiceConnection(client) {
 
 async function refreshPresence(client) {
   try {
-    const activity = config.general?.activity || {};
-    const typeKey = String(activity.type || 'Streaming').trim().toLowerCase();
-    const typeMap = {
-      playing: ActivityType.Playing,
-      streaming: ActivityType.Streaming,
-      listening: ActivityType.Listening,
-      watching: ActivityType.Watching,
-      competing: ActivityType.Competing,
-      custom: ActivityType.Custom,
-    };
-    const statusKey = String(config.general?.presence?.status || 'idle').trim().toLowerCase();
-    const status = ['online', 'idle', 'dnd', 'invisible'].includes(statusKey) ? statusKey : 'idle';
-    client.user.setPresence({
-      activities: [{
-        type: typeMap[typeKey] || ActivityType.Streaming,
-        name: activity.name || '𓆩𝐄𝐥.𝐊𝐛𝐞𝐫 𝐅𝐀𝐌𝐈𝐋𝐘𓆪',
-        url: activity.url,
-      }],
-      status,
-    });
+    if (config.general.activity) {
+      client.user.setPresence({
+        activities: [{
+          type: ActivityType[config.general.activity.type] || ActivityType.Streaming,
+          name: config.general.activity.name || '𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘𓆪',
+          url: config.general.activity.url,
+        }],
+        status: 'idle',
+      });
+    }
   } catch (e) {
     console.error('⚠️ Failed to refresh presence:', e.message);
   }
@@ -167,21 +155,6 @@ for (const file of commandFiles) {
   } catch (e) {
     console.error(`❌ Failed to load command ${file}:`, e.message);
   }
-}
-
-// فحص عقدة ملفات أمر الرتب الجماعي — يمنع نسخاً متعارضة صامتة على السيرفر
-try {
-  const rolesCheck = await import('./commands/roles.js');
-  const btnCheck = await import('./utils/buttonHandler.js');
-  const hasRoleHandler = typeof rolesCheck.handleBulkRolesButton === 'function';
-  const btnRoutesRoles = btnCheck.handleButtonInteraction.toString().includes('confirm_roles_');
-  if (!hasRoleHandler || !btnRoutesRoles) {
-    console.warn('⚠️ [roles] عقدة الإصدارات مكسورة: roles.js يجب يصدّر handleBulkRolesButton و buttonHandler.js يجب يوجّه confirm_roles_.\n   أعِد رفع commands/roles.js + utils/buttonHandler.js معاً بنفس النسخة ثم أعد تشغيل البوت.');
-  } else {
-    console.log('✅ [roles] عقدة الإصدارات سليمة (roles.js + buttonHandler.js متوافقان).');
-  }
-} catch (e) {
-  console.warn('⚠️ [roles] تعذر فحص عقدة الإصدارات:', e.message);
 }
 
 import { setSenderClient, cancelBroadcast, SendJob, queue } from './utils/broadcastSender.js';
@@ -248,7 +221,6 @@ client.once(Events.ClientReady, async () => {
       await updateAttendancePanel(guild).catch(e => console.error('[Index] updateAttendancePanel:', e?.message));
       deployGuideToAllMembers(client).catch(e => console.error('[Index] deployGuide:', e?.message));
       initActiveScenarios(client).catch(e => console.error('[Index] scenarios:', e?.message));
-      await restoreActiveSessions(client).catch(e => console.error('[Index] permissionSessions:', e?.message));
       console.log('✅ Systems restored.');
     } catch (err) {
       console.error('❌ Restoration sequence error:', err);
@@ -270,11 +242,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const command = client.commands.get(interaction.commandName);
       if (command?.autocomplete) await command.autocomplete(interaction);
       return;
-    }
-
-    // نظام طلبات التعديل المراقب (يشتغل في السيرفر وفي الخاص — الصلاحية داخلية)
-    if (interaction.customId && interaction.customId.startsWith('perm_')) {
-      return await handlePermissionSystemInteraction(interaction);
     }
 
     if (interaction.isChatInputCommand()) {
@@ -372,22 +339,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (customId.startsWith('cmd_confirm_fire_') || customId.startsWith('cmd_cancel_fire_') ||
           customId.startsWith('cmd_confirm_bl_') || customId.startsWith('cmd_cancel_bl_')) {
         return await handleConfirmButton(interaction);
-      }
-
-      // أزرار تأكيد/إلغاء أمر الرتب الجماعي (تتجاوز صلاحية لأن الصلاحية داخلية)
-      if (customId.startsWith('confirm_roles_') || customId.startsWith('cancel_roles_')) {
-        try {
-          const mod = await import('./commands/roles.js');
-          if (typeof mod.handleBulkRolesButton !== 'function') {
-            console.error('❌ [roles] commands/roles.js قديم — لا يحتوي handleBulkRolesButton. أعِد رفع roles.js + buttonHandler.js معاً.');
-            return interaction.reply({ content: '⚠️ إصدار ملف roles.js قديم. أعِد رفع commands/roles.js + utils/buttonHandler.js معاً.', flags: MessageFlags.Ephemeral });
-          }
-          console.log(`[roles] زر مستلم: ${customId}`);
-          return await mod.handleBulkRolesButton(interaction);
-        } catch (e) {
-          console.error('❌ [roles] خطأ في توجيه زر الرتب:', e);
-          return interaction.reply({ content: `❌ خطأ أثناء معالجة الزر: ${e.message}`, flags: MessageFlags.Ephemeral });
-        }
       }
 
       // أزرار لوحة إدارة البوت (تتجاوز صلاحية لأن الصلاحية داخلية)
@@ -632,7 +583,7 @@ function isReportInteraction(interaction) {
 }
 
 client.on(Events.MessageCreate, async (message) => {
-  if (message.author?.bot || message.webhookId) return;
+  if (message.author?.bot) return;
   if (reportHandler && typeof reportHandler.handleMessage === 'function') await reportHandler.handleMessage(message);
   try {
     const { handleScenarioExcuseMessage } = await import('./utils/scenarioManager.js');
@@ -712,16 +663,10 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
   try {
     const cfgCache = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-
-    // ترحيب العضو الجديد: رتبة الترحيب + الاسم KR • اسمه (لغير أعضاء العائلة)
-    if (isWelcomeEnabled(cfgCache)) {
-      await applyWelcome(member, cfgCache).catch(() => {});
-    }
-
     const memberRecord = await Member.findOne({ discordId: member.id });
     if (memberRecord && memberRecord.isActive) {
       if (memberRecord.gameName && memberRecord.gameId) {
-        await setNicknameRobust(member, `KR • ${memberRecord.gameName} El.Kber 〢${memberRecord.gameId}`, 'عودة عضو عائلة').catch(() => {});
+        await member.setNickname(`IQ • ${memberRecord.gameName} X.IRAQ 〢${memberRecord.gameId}`).catch(() => {});
       }
       const rolesToAdd = [];
       if (cfgCache.roles?.basic?.id) rolesToAdd.push(cfgCache.roles.basic.id);
@@ -894,3 +839,4 @@ async function setupBroadcastSystem(mainClient) {
 }
 
 client.login(config.bot.token);
+// test

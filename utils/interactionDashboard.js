@@ -186,7 +186,8 @@ function buildMemberSelectRow() {
 
 function buildMemberActionRows({ disabled = false } = {}) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('int_member_grace').setEmoji('🕐').setLabel('منح سماح 24 ساعة').setStyle(ButtonStyle.Primary).setDisabled(disabled),
+    new ButtonBuilder().setCustomId('int_member_grace').setEmoji('🕐').setLabel('منح سماح').setStyle(ButtonStyle.Primary).setDisabled(disabled),
+    new ButtonBuilder().setCustomId('int_member_setstatus').setEmoji('🖐️').setLabel('تغيير الحالة').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
     new ButtonBuilder().setCustomId('int_member_addpoints').setEmoji('➕').setLabel('إضافة نقاط').setStyle(ButtonStyle.Success).setDisabled(disabled),
     new ButtonBuilder().setCustomId('int_member_progress').setEmoji('📈').setLabel('عرض التقدم').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
     new ButtonBuilder().setCustomId('int_member_reclassify').setEmoji('🔄').setLabel('إعادة تصنيف').setStyle(ButtonStyle.Danger).setDisabled(disabled),
@@ -224,6 +225,7 @@ async function buildMemberInfoEmbed(discordId, guild) {
 
   const lines = [
     `**الحالة:** ${statusLabel} ${result.emoji || ''}`,
+    member.statusOverride ? `**🖐️ تجاوز يدوي:** ${statusLabels[member.statusOverride] || member.statusOverride}` : '',
     `**النقاط اليوم:** ${todayPoints} / ${goalPoints}`,
     `**الرتبة الحالية:** ${rp?.currentRank || member.currentRank || '—'}`,
     rp?.nextRank ? `**الرتبة القادمة:** ${rp.nextRank} — باقيلك ${rp.pointsNeeded} نقطة / ${rp.estimatedDaysForDays} يوم` : '**🚀 وصل لأعلى رتبة!**',
@@ -753,12 +755,45 @@ export async function handleInteractionDashboardButton(interaction) {
 
     // ===== أزرار إدارة الأعضاء =====
     if (customId === 'int_member_grace') {
-      await interaction.deferReply({ ephemeral: true });
       const discordId = getSelectedMember(interaction);
-      if (!discordId) return interaction.editReply({ content: '❌ اختر عضو أولاً.' });
-      const { createGracePeriod } = await import('./interactionSystem.js');
-      await createGracePeriod(discordId, 'admin_panel', interaction.guild, interaction.client, { by: interaction.user.id });
-      return interaction.editReply({ content: `✅ تم منح <@${discordId}> فترة سماح 24 ساعة.` });
+      if (!discordId) return interaction.reply({ content: '❌ اختر عضو أولاً.', flags: MessageFlags.Ephemeral });
+      const modal = new ModalBuilder()
+        .setCustomId('int_member_grace_modal')
+        .setTitle('🕐 منح فترة سماح')
+        .addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('hours')
+              .setLabel('مدة السماح (بالساعات)')
+              .setStyle(TextInputStyle.Short)
+              .setPlaceholder('مثال: 24 — أو 48 للتحويل الطويلة')
+              .setRequired(true),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('reason')
+              .setLabel('السبب')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false),
+          ),
+        );
+      return interaction.showModal(modal);
+    }
+    if (customId === 'int_member_setstatus') {
+      const discordId = getSelectedMember(interaction);
+      if (!discordId) return interaction.reply({ content: '❌ اختر عضو أولاً.', flags: MessageFlags.Ephemeral });
+      const row = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('int_member_setstatus_sel')
+          .setPlaceholder('🎯 اختر الحالة الجديدة')
+          .addOptions([
+            { label: '🟢 متفاعل', value: 'active_high', description: 'تثبيت تصنيف العضو كمتفاعل' },
+            { label: '🟡 خامل', value: 'inactive', description: 'تثبيت تصنيف العضو كخامل' },
+            { label: '🔴 مخالف', value: 'violator', description: 'تثبيت تصنيف العضو كمخالف' },
+            { label: '🔄 تلقائي', value: 'auto', description: 'الرجوع للتصنيف التلقائي حسب النقاط' },
+          ])
+      );
+      return interaction.reply({ content: `👤 <@${discordId}> — حدد الحالة الجديدة:`, components: [row], flags: MessageFlags.Ephemeral });
     }
     if (customId === 'int_member_addpoints') {
       const discordId = getSelectedMember(interaction);
@@ -859,6 +894,27 @@ export async function handleInteractionDashboardSelect(interaction) {
       selectedMemberIds.set(getPanelKey(interaction), discordId);
       return showPage(interaction, { page: 'section', sectionId: 'members', pageIndex: 0 });
     }
+    if (customId === 'int_member_setstatus_sel') {
+      await interaction.deferReply({ ephemeral: true });
+      const discordId = getSelectedMember(interaction);
+      const value = interaction.values?.[0];
+      if (!discordId || !value) return interaction.editReply({ content: '❌ اختر حالة.' });
+      const Member = (await import('../models/Member.js')).default;
+      const { updateRoomEmoji, getStatusEmoji } = await import('./interactionSystem.js');
+      const member = await Member.findOne({ discordId });
+      if (!member) return interaction.editReply({ content: '❌ العضو غير مسجل في النظام.' });
+      if (value === 'auto') {
+        member.statusOverride = null;
+        await member.save();
+        await updateRoomEmoji(interaction.guild, discordId).catch(() => {});
+        return interaction.editReply({ content: `🔄 رجعت تصنيف <@${discordId}> تلقائياً حسب النقاط.` });
+      }
+      member.statusOverride = value;
+      await member.save();
+      await updateRoomEmoji(interaction.guild, discordId, getStatusEmoji(value)).catch(() => {});
+      const labels = { active_high: '🟢 متفاعل', inactive: '🟡 خامل', violator: '🔴 مخالف' };
+      return interaction.editReply({ content: `✅ تم تثبيت <@${discordId}> كـ **${labels[value]}** (يبقى هكذا حتى تغيّره يدوياً أو تعيده تلقائي).` });
+    }
     if (customId.startsWith('int_editch_')) {
       const rest = customId.replace('int_editch_', '');
       const idx = rest.indexOf('_');
@@ -878,6 +934,29 @@ export async function handleInteractionDashboardSelect(interaction) {
 
 export async function handleInteractionDashboardModal(interaction) {
   const customId = interaction.customId;
+  if (customId === 'int_member_grace_modal') {
+    const config = loadConfig();
+    if (!hasPanelAccess(interaction.member, config)) {
+      return interaction.reply({ content: '❌ لا تملك صلاحية تعديل لوحة التفاعل.', flags: MessageFlags.Ephemeral });
+    }
+    try {
+      await interaction.deferReply({ ephemeral: true });
+      const discordId = getSelectedMember(interaction);
+      if (!discordId) return interaction.editReply({ content: '❌ اختر عضو أولاً.' });
+      const hours = parseFloat(interaction.fields.getTextInputValue('hours'));
+      if (isNaN(hours) || hours <= 0 || hours > 720) {
+        return interaction.editReply({ content: '❌ أدخل مدة صحيحة بالساعات (1 إلى 720).' });
+      }
+      const reason = interaction.fields.getTextInputValue('reason') || 'منح سماح من لوحة التفاعل';
+      const { createGracePeriod } = await import('./interactionSystem.js');
+      await createGracePeriod(discordId, 'admin_panel', interaction.guild, interaction.client, { by: interaction.user.id, reason }, hours);
+      const disp = hours % 1 === 0 ? hours : hours.toFixed(1);
+      return interaction.editReply({ content: `✅ تم منح <@${discordId}> فترة سماح **${disp} ساعة**.\nالسبب: ${reason}` });
+    } catch (err) {
+      logSentError('InteractionDashboard grace modal', err);
+      return interaction.editReply({ content: `❌ حدث خطأ: ${err.message}` }).catch(() => {});
+    }
+  }
   if (customId === 'int_member_addpoints_modal') {
     const config = loadConfig();
     if (!hasPanelAccess(interaction.member, config)) {

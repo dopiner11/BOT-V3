@@ -273,7 +273,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (customId.startsWith('cfg_modal_')) return await handleConfigDashboardModal(interaction);
 
       // مودالات لوحة التفاعل (الصلاحية داخلية في المعالج)
-      if (customId.startsWith('int_modal_') || customId === 'int_member_addpoints_modal') return await handleInteractionDashboardModal(interaction);
+      if (customId.startsWith('int_modal_') || customId === 'int_member_addpoints_modal' || customId === 'int_member_grace_modal') return await handleInteractionDashboardModal(interaction);
 
       // مودالات السيناريوهات (تتجاوز صلاحية لأن الصلاحية داخلية)
       if (customId.startsWith('scn_')) return await handleScenarioInteraction(interaction);

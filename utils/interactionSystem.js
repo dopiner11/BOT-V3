@@ -1389,6 +1389,12 @@ export async function quickClassify(discordId) {
   if (!member) return { status: 'unknown', points: 0 };
 
   const points = await getTodayPoints(discordId);
+
+  // تجاوز يدوي من الإدارة (متفاعل/خامل/مخالف) — يثبت التصنيف الحركي
+  if (member.statusOverride && ['active_high', 'inactive', 'violator'].includes(member.statusOverride)) {
+    return { status: member.statusOverride, points, emoji: STATUS_EMOJI[member.statusOverride] || '❌', member };
+  }
+
   const now = new Date();
 
   const graceDate = new Date(Date.now() - getInteractionConfig().graceDays * 24 * 60 * 60 * 1000);
@@ -2041,63 +2047,67 @@ export async function assessMemberStatus(client, guild, discordId, { silentInit 
   return true;
 }
 
-export async function createGracePeriod(userId, reason, guild, client, relatedInfo) {
+export async function createGracePeriod(userId, reason, guild, client, relatedInfo, durationHours = 24) {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + GRACE24H_MS);
+  const hours = Number(durationHours) > 0 ? Number(durationHours) : 24;
+  const expiresAt = new Date(now.getTime() + hours * 60 * 60 * 1000);
 
   await Grace24h.deleteMany({ userId }).catch(e => console.error('Failed to clear old grace periods:', e));
 
   const grace = await Grace24h.create({ userId, expiresAt, reason, createdAt: now });
-  await notifyGracePeriod(userId, reason, guild, client, relatedInfo);
+  await notifyGracePeriod(userId, reason, guild, client, relatedInfo, hours);
 
   return grace;
 }
 
-async function notifyGracePeriod(userId, reason, guild, client, relatedInfo) {
+async function notifyGracePeriod(userId, reason, guild, client, relatedInfo, durationHours = 24) {
   const user = await client?.users.fetch(userId).catch(() => null);
   const logChannelId = getInteractionConfig().channels.log;
+  const hours = Number(durationHours) > 0 ? Number(durationHours) : 24;
+  const hoursText = `${hours % 1 === 0 ? hours : hours.toFixed(1)} ساعة`;
+  const durMs = hours * 60 * 60 * 1000;
 
   let dmText, logText, logColor;
 
   switch (reason) {
     case 'vacation_broken':
-      dmText = `✅ تم كسر إجازتك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.\nالسبب: ${relatedInfo?.reason || ''}`;
-      logText = `🕐 **فترة سماح 24 ساعة** — تم كسر إجازة <@${userId}>`;
+      dmText = `✅ تم كسر إجازتك. لديك ${hoursText} فترة سماح للتفاعل قبل احتساب نقاطك.\nالسبب: ${relatedInfo?.reason || ''}`;
+      logText = `🕐 **فترة سماح ${hoursText}** — تم كسر إجازة <@${userId}>`;
       logColor = 0xFF9900;
       break;
     case 'vacation_ended':
-      dmText = `✅ انتهت إجازتك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.`;
-      logText = `🕐 **فترة سماح 24 ساعة** — انتهت إجازة <@${userId}> تلقائياً`;
+      dmText = `✅ انتهت إجازتك. لديك ${hoursText} فترة سماح للتفاعل قبل احتساب نقاطك.`;
+      logText = `🕐 **فترة سماح ${hoursText}** — انتهت إجازة <@${userId}> تلقائياً`;
       logColor = 0xFF9900;
       break;
     case 'excuse_broken':
-      dmText = `✅ تم كسر عذرك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.\nالسبب: ${relatedInfo?.reason || ''}`;
-      logText = `🕐 **فترة سماح 24 ساعة** — تم كسر عذر <@${userId}>${relatedInfo?.type ? ` (${relatedInfo.type})` : ''}`;
+      dmText = `✅ تم كسر عذرك. لديك ${hoursText} فترة سماح للتفاعل قبل احتساب نقاطك.\nالسبب: ${relatedInfo?.reason || ''}`;
+      logText = `🕐 **فترة سماح ${hoursText}** — تم كسر عذر <@${userId}>${relatedInfo?.type ? ` (${relatedInfo.type})` : ''}`;
       logColor = 0xFF9900;
       break;
     case 'excuse_ended':
-      dmText = `✅ انتهى عذرك. لديك 24 ساعة فترة سماح للتفاعل قبل احتساب نقاطك.`;
-      logText = `🕐 **فترة سماح 24 ساعة** — انتهى عذر <@${userId}> تلقائياً`;
+      dmText = `✅ انتهى عذرك. لديك ${hoursText} فترة سماح للتفاعل قبل احتساب نقاطك.`;
+      logText = `🕐 **فترة سماح ${hoursText}** — انتهى عذر <@${userId}> تلقائياً`;
       logColor = 0xFF9900;
       break;
     case 'new_member':
-      dmText = `🎉 مرحباً بك في العائلة! لديك 24 ساعة فترة سماح للتفاعل وجمع النقاط.`;
-      logText = `🆕 **فترة سماح 24 ساعة** — عضو جديد: <@${userId}>`;
+      dmText = `🎉 مرحباً بك في العائلة! لديك ${hoursText} فترة سماح للتفاعل وجمع النقاط.`;
+      logText = `🆕 **فترة سماح ${hoursText}** — عضو جديد: <@${userId}>`;
       logColor = 0x00FF00;
       break;
     default:
-      dmText = `✅ لديك 24 ساعة فترة سماح للتفاعل.`;
-      logText = `🕐 **فترة سماح 24 ساعة** — <@${userId}>`;
+      dmText = `✅ لديك ${hoursText} فترة سماح للتفاعل.`;
+      logText = `🕐 **فترة سماح ${hoursText}** — <@${userId}>`;
       logColor = 0xFF9900;
   }
 
   const graceFields = [
     { name: 'العضو', value: `<@${userId}> (${userId})`, inline: true },
-    { name: 'تنتهي في', value: `<t:${Math.floor((Date.now() + GRACE24H_MS) / 1000)}:R>`, inline: true },
+    { name: 'تنتهي في', value: `<t:${Math.floor((Date.now() + durMs) / 1000)}:R>`, inline: true },
   ];
   if (relatedInfo?.reason) graceFields.push({ name: 'السبب', value: relatedInfo.reason, inline: false });
   if (relatedInfo?.by) graceFields.push({ name: 'بواسطة', value: relatedInfo.by, inline: true });
-  const embed = embedWarning('🕐 فترة سماح 24 ساعة', logText, graceFields);
+  const embed = embedWarning(`🕐 فترة سماح ${hoursText}`, logText, graceFields);
 
   if (user) {
     await dmUser(user, embed);

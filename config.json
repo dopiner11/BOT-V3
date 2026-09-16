@@ -433,6 +433,22 @@
       }
     }
   },
+  "dailyGuide": {
+    "_label": "الإشعارات اليومية - خطة اليوم وتذكير نهاية اليوم وغرف الأعضاء",
+    "enabled": false,
+    "_label_morning": "موعد إرسال خطة اليوم الصباحية (بغداد)",
+    "morningHour": 8,
+    "morningMinute": 0,
+    "_label_endOfDay": "موعد تنبيه نهاية اليوم (بغداد)",
+    "endOfDayHour": 23,
+    "endOfDayMinute": 0,
+    "_label_goal": "الهدف اليومي بالنقاط (اتركه null = يتبع حد المتفاعل تلقائياً)",
+    "goalPoints": null,
+    "_label_useRoom": "يرسل في غرفة العضو الشخصية بدل الرسائل الخاصة",
+    "useRoom": true,
+    "_label_help": "روم المساعدة (منشن عند الحاجة)",
+    "helpChannelId": ""
+  },
   "promotion": {
     "_label": "نظام الرتب والترقيات",
     "ranks": [

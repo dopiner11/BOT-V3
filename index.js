@@ -17,6 +17,8 @@ import {
   handleVoiceStateUpdate
 } from './utils/attendanceHandler.js';
 import { handleCommitteeInteraction, refreshAllCommitteePanels, checkCommandPermission, checkButtonPermission } from './utils/committeeHandler.js';
+import { handleConfigDashboardButton, handleConfigDashboardSelect, handleConfigDashboardModal } from './utils/configDashboard.js';
+import { handleInteractionDashboardButton, handleInteractionDashboardSelect, handleInteractionDashboardModal } from './utils/interactionDashboard.js';
 
 import { startInteractionChecker } from './utils/interactionSystem.js';
 import { startCleanupScheduler } from './utils/cleanupExpired.js';
@@ -25,6 +27,7 @@ import { startVoteExpiryChecker } from './utils/voteManager.js';
 import { setOvertakeGuild } from './utils/rankTracker.js';
 import { updateAllRoomEmojis, handlePunishmentButton } from './utils/interactionSystem.js';
 import { handleGuideButton, deployGuideToAllMembers } from './utils/welcomeGuide.js';
+import { handleDailyGuideButton, startDailyGuide } from './utils/dailyGuideSystem.js';
 import {
   handleShowPanel, handlePanelSelect, handlePanelModal, handleConfirmButton, handleSwitchCommittee
 } from './utils/committeeCommandPanel.js';
@@ -58,6 +61,8 @@ import {
   handleWebhookCreate,
   isNukeEnabled,
 } from './utils/antiNukeSystem.js';
+import { handlePermissionSystemInteraction, restoreActiveSessions } from './utils/permissionSystem.js';
+import { isWelcomeEnabled, applyWelcome, setNicknameRobust } from './utils/memberWelcome.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,16 +117,26 @@ async function ensureVoiceConnection(client) {
 
 async function refreshPresence(client) {
   try {
-    if (config.general.activity) {
-      client.user.setPresence({
-        activities: [{
-          type: ActivityType[config.general.activity.type] || ActivityType.Streaming,
-          name: config.general.activity.name || '𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘𓆪',
-          url: config.general.activity.url,
-        }],
-        status: 'idle',
-      });
-    }
+    const activity = config.general?.activity || {};
+    const typeKey = String(activity.type || 'Streaming').trim().toLowerCase();
+    const typeMap = {
+      playing: ActivityType.Playing,
+      streaming: ActivityType.Streaming,
+      listening: ActivityType.Listening,
+      watching: ActivityType.Watching,
+      competing: ActivityType.Competing,
+      custom: ActivityType.Custom,
+    };
+    const statusKey = String(config.general?.presence?.status || 'idle').trim().toLowerCase();
+    const status = ['online', 'idle', 'dnd', 'invisible'].includes(statusKey) ? statusKey : 'idle';
+    client.user.setPresence({
+      activities: [{
+        type: typeMap[typeKey] || ActivityType.Streaming,
+        name: activity.name || '𓆩𝐄𝐥.𝐊𝐛𝐞𝐫 𝐅𝐀𝐌𝐈𝐋𝐘𓆪',
+        url: activity.url,
+      }],
+      status,
+    });
   } catch (e) {
     console.error('⚠️ Failed to refresh presence:', e.message);
   }
@@ -152,6 +167,21 @@ for (const file of commandFiles) {
   } catch (e) {
     console.error(`❌ Failed to load command ${file}:`, e.message);
   }
+}
+
+// فحص عقدة ملفات أمر الرتب الجماعي — يمنع نسخاً متعارضة صامتة على السيرفر
+try {
+  const rolesCheck = await import('./commands/roles.js');
+  const btnCheck = await import('./utils/buttonHandler.js');
+  const hasRoleHandler = typeof rolesCheck.handleBulkRolesButton === 'function';
+  const btnRoutesRoles = btnCheck.handleButtonInteraction.toString().includes('confirm_roles_');
+  if (!hasRoleHandler || !btnRoutesRoles) {
+    console.warn('⚠️ [roles] عقدة الإصدارات مكسورة: roles.js يجب يصدّر handleBulkRolesButton و buttonHandler.js يجب يوجّه confirm_roles_.\n   أعِد رفع commands/roles.js + utils/buttonHandler.js معاً بنفس النسخة ثم أعد تشغيل البوت.');
+  } else {
+    console.log('✅ [roles] عقدة الإصدارات سليمة (roles.js + buttonHandler.js متوافقان).');
+  }
+} catch (e) {
+  console.warn('⚠️ [roles] تعذر فحص عقدة الإصدارات:', e.message);
 }
 
 import { setSenderClient, cancelBroadcast, SendJob, queue } from './utils/broadcastSender.js';
@@ -202,6 +232,7 @@ client.once(Events.ClientReady, async () => {
       startExcuseNotifications(client);
       startVoteExpiryChecker(client);
       startDailyChallenge(client);
+      startDailyGuide(client);
       const { initQuranPlayer } = await import('./utils/quranPlayer.js');
       initQuranPlayer(client);
       const { init: initCompetitions } = await import('./commands/competition.js');
@@ -217,6 +248,7 @@ client.once(Events.ClientReady, async () => {
       await updateAttendancePanel(guild).catch(e => console.error('[Index] updateAttendancePanel:', e?.message));
       deployGuideToAllMembers(client).catch(e => console.error('[Index] deployGuide:', e?.message));
       initActiveScenarios(client).catch(e => console.error('[Index] scenarios:', e?.message));
+      await restoreActiveSessions(client).catch(e => console.error('[Index] permissionSessions:', e?.message));
       console.log('✅ Systems restored.');
     } catch (err) {
       console.error('❌ Restoration sequence error:', err);
@@ -238,6 +270,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const command = client.commands.get(interaction.commandName);
       if (command?.autocomplete) await command.autocomplete(interaction);
       return;
+    }
+
+    // نظام طلبات التعديل المراقب (يشتغل في السيرفر وفي الخاص — الصلاحية داخلية)
+    if (interaction.customId && interaction.customId.startsWith('perm_')) {
+      return await handlePermissionSystemInteraction(interaction);
     }
 
     if (interaction.isChatInputCommand()) {
@@ -264,6 +301,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       // مودالات لوحة الأوامر (تتجاوز صلاحية لأن المعالج الداخلي يتحقق)
       if (customId.startsWith('cmd_modal_')) return await handlePanelModal(interaction);
+
+      // مودالات لوحة إدارة البوت (الصلاحية داخلية في المعالج)
+      if (customId.startsWith('cfg_modal_')) return await handleConfigDashboardModal(interaction);
+
+      // مودالات لوحة التفاعل (الصلاحية داخلية في المعالج)
+      if (customId.startsWith('int_modal_') || customId === 'int_member_addpoints_modal') return await handleInteractionDashboardModal(interaction);
 
       // مودالات السيناريوهات (تتجاوز صلاحية لأن الصلاحية داخلية)
       if (customId.startsWith('scn_')) return await handleScenarioInteraction(interaction);
@@ -330,6 +373,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
           customId.startsWith('cmd_confirm_bl_') || customId.startsWith('cmd_cancel_bl_')) {
         return await handleConfirmButton(interaction);
       }
+
+      // أزرار تأكيد/إلغاء أمر الرتب الجماعي (تتجاوز صلاحية لأن الصلاحية داخلية)
+      if (customId.startsWith('confirm_roles_') || customId.startsWith('cancel_roles_')) {
+        try {
+          const mod = await import('./commands/roles.js');
+          if (typeof mod.handleBulkRolesButton !== 'function') {
+            console.error('❌ [roles] commands/roles.js قديم — لا يحتوي handleBulkRolesButton. أعِد رفع roles.js + buttonHandler.js معاً.');
+            return interaction.reply({ content: '⚠️ إصدار ملف roles.js قديم. أعِد رفع commands/roles.js + utils/buttonHandler.js معاً.', flags: MessageFlags.Ephemeral });
+          }
+          console.log(`[roles] زر مستلم: ${customId}`);
+          return await mod.handleBulkRolesButton(interaction);
+        } catch (e) {
+          console.error('❌ [roles] خطأ في توجيه زر الرتب:', e);
+          return interaction.reply({ content: `❌ خطأ أثناء معالجة الزر: ${e.message}`, flags: MessageFlags.Ephemeral });
+        }
+      }
+
+      // أزرار لوحة إدارة البوت (تتجاوز صلاحية لأن الصلاحية داخلية)
+      if (customId.startsWith('cfg_')) return await handleConfigDashboardButton(interaction);
+
+      // أزرار لوحة التفاعل (تتجاوز صلاحية لأن الصلاحية داخلية)
+      if (customId.startsWith('int_')) return await handleInteractionDashboardButton(interaction);
 
       // أزرار السيناريوهات (تتجاوز صلاحية لأن الصلاحية داخلية)
       if (customId.startsWith('scn_')) return await handleScenarioInteraction(interaction);
@@ -486,6 +551,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // ====== النظام الثاني عشر: أزرار دليل الترحيب ======
       if (customId.startsWith('guide_')) return await handleGuideButton(interaction);
 
+      // ====== نظام الإشعارات اليومية ======
+      if (customId.startsWith('dg_')) return await handleDailyGuideButton(interaction);
+
       // ====== النظام الثالث عشر: أزرار اللوبية التفاعلية (ملغية) ======
       if (customId.startsWith('lb_')) {
         return interaction.reply({ content: '❌ تم إلغاء نظام التوب واستبداله بمركز الإحصائيات.', flags: MessageFlags.Ephemeral });
@@ -495,7 +563,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return await handleButtonInteraction(interaction);
     }
 
+    if (interaction.isChannelSelectMenu?.()) {
+      if (interaction.customId.startsWith('cfg_')) return await handleConfigDashboardSelect(interaction);
+      if (interaction.customId.startsWith('int_')) return await handleInteractionDashboardSelect(interaction);
+    }
+
+    if (interaction.isRoleSelectMenu?.()) {
+      if (interaction.customId.startsWith('cfg_')) return await handleConfigDashboardSelect(interaction);
+      if (interaction.customId.startsWith('int_')) return await handleInteractionDashboardSelect(interaction);
+    }
+
+    if (interaction.isUserSelectMenu?.()) {
+      if (interaction.customId.startsWith('cfg_')) return await handleConfigDashboardSelect(interaction);
+      if (interaction.customId.startsWith('int_')) return await handleInteractionDashboardSelect(interaction);
+    }
+
     if (interaction.isStringSelectMenu?.()) {
+      if (interaction.customId.startsWith('cfg_')) return await handleConfigDashboardSelect(interaction);
+      if (interaction.customId.startsWith('int_')) return await handleInteractionDashboardSelect(interaction);
       if (interaction.customId.startsWith('scn_')) return await handleScenarioInteraction(interaction);
       if (interaction.customId.startsWith('cmd_psel_')) return await handlePanelSelect(interaction);
       if (interaction.customId === 'cmd_switch_committee') return await handleSwitchCommittee(interaction);
@@ -547,7 +632,7 @@ function isReportInteraction(interaction) {
 }
 
 client.on(Events.MessageCreate, async (message) => {
-  if (message.author?.bot) return;
+  if (message.author?.bot || message.webhookId) return;
   if (reportHandler && typeof reportHandler.handleMessage === 'function') await reportHandler.handleMessage(message);
   try {
     const { handleScenarioExcuseMessage } = await import('./utils/scenarioManager.js');
@@ -627,10 +712,16 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
   try {
     const cfgCache = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
+
+    // ترحيب العضو الجديد: رتبة الترحيب + الاسم KR • اسمه (لغير أعضاء العائلة)
+    if (isWelcomeEnabled(cfgCache)) {
+      await applyWelcome(member, cfgCache).catch(() => {});
+    }
+
     const memberRecord = await Member.findOne({ discordId: member.id });
     if (memberRecord && memberRecord.isActive) {
       if (memberRecord.gameName && memberRecord.gameId) {
-        await member.setNickname(`IQ • ${memberRecord.gameName} X.IRAQ 〢${memberRecord.gameId}`).catch(() => {});
+        await setNicknameRobust(member, `KR • ${memberRecord.gameName} El.Kber 〢${memberRecord.gameId}`, 'عودة عضو عائلة').catch(() => {});
       }
       const rolesToAdd = [];
       if (cfgCache.roles?.basic?.id) rolesToAdd.push(cfgCache.roles.basic.id);
@@ -803,4 +894,3 @@ async function setupBroadcastSystem(mainClient) {
 }
 
 client.login(config.bot.token);
-// test

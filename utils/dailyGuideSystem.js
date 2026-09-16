@@ -86,19 +86,24 @@ async function getTodayPoints(discordId) {
   return result.length > 0 ? Math.max(0, result[0].total) : 0;
 }
 
-async function getMemberProtection(discordId) {
+/* أصحاب الأعذار/الإجازات دفعة واحدة — المعفون من الإشعارات */
+async function getProtectedMemberIds(discordIds) {
+  if (!discordIds.length) return { protected: new Set(), grace: new Set() };
   const now = new Date();
   const graceDate = new Date(Date.now() - getInteractionConfig().graceDays * 24 * 60 * 60 * 1000);
-  const [vacations, excuses, grace, isNew] = await Promise.all([
-    Vacation.find({ status: 'active', endDate: { $gte: now }, memberId: discordId }),
-    Excuse.find({ isActive: { $ne: false }, type: { $ne: 'تغير اسم' }, endDate: { $gte: now }, memberId: discordId }),
-    Grace24h.findOne({ userId: discordId, expiresAt: { $gt: now } }),
-    Member.findOne({ discordId, createdAt: { $gte: graceDate } }),
+  const [vacations, excuses, graces, newMembers] = await Promise.all([
+    Vacation.find({ status: 'active', endDate: { $gte: now }, memberId: { $in: discordIds } }),
+    Excuse.find({ isActive: { $ne: false }, type: { $ne: 'تغير اسم' }, endDate: { $gte: now }, memberId: { $in: discordIds } }),
+    Grace24h.find({ userId: { $in: discordIds }, expiresAt: { $gt: now } }),
+    Member.find({ discordId: { $in: discordIds }, createdAt: { $gte: graceDate } }),
   ]);
-  return {
-    isProtected: vacations.length > 0 || excuses.length > 0,
-    isGrace: !!(grace || isNew),
-  };
+  const protectedIds = new Set();
+  for (const v of vacations) protectedIds.add(v.memberId);
+  for (const e of excuses) protectedIds.add(e.memberId);
+  const graceIds = new Set();
+  for (const g of graces) graceIds.add(g.userId);
+  for (const n of newMembers) graceIds.add(n.discordId);
+  return { protected: protectedIds, grace: graceIds };
 }
 
 /* الأعضاء اللي وصلهم إشعار معيّن لهذا اليوم */
@@ -154,11 +159,13 @@ async function sendMorningNotification(client, guild) {
   const members = await getActiveMembersWithRoom();
   const notified = await getNotifiedMemberIds('morningNotifiedAt');
   const pointsMap = await getBatchTodayPoints(members.map(m => m.discordId));
+  const { protected: protectedIds } = await getProtectedMemberIds(members.map(m => m.discordId));
   let sent = 0;
 
   for (const m of members) {
     try {
       if (notified.has(m.discordId)) continue;
+      if (protectedIds.has(m.discordId)) continue;
       const room = await getMemberRoom(guild, m);
       if (!room) continue;
 
@@ -204,11 +211,13 @@ async function checkDailyGoalReached(client, guild) {
   const members = await getActiveMembersWithRoom();
   const notified = await getNotifiedMemberIds('goalNotifiedAt');
   const pointsMap = await getBatchTodayPoints(members.map(m => m.discordId));
+  const { protected: protectedIds } = await getProtectedMemberIds(members.map(m => m.discordId));
   let sent = 0;
 
   for (const m of members) {
     try {
       if (notified.has(m.discordId)) continue;
+      if (protectedIds.has(m.discordId)) continue;
       const todayPoints = pointsMap[m.discordId] ?? 0;
       if (todayPoints < dg.goalPoints) continue;
 
@@ -253,15 +262,14 @@ async function sendEndOfDayWarning(client, guild) {
   const members = await getActiveMembersWithRoom();
   const notified = await getNotifiedMemberIds('eodNotifiedAt');
   const pointsMap = await getBatchTodayPoints(members.map(m => m.discordId));
+  const { protected: protectedIds, grace: graceIds } = await getProtectedMemberIds(members.map(m => m.discordId));
   const maxWarnings = getInteractionConfig().maxWarnings;
   let sent = 0;
 
   for (const m of members) {
     try {
       if (notified.has(m.discordId)) continue;
-
-      const { isProtected, isGrace } = await getMemberProtection(m.discordId);
-      if (isProtected || isGrace) continue;
+      if (protectedIds.has(m.discordId) || graceIds.has(m.discordId)) continue;
 
       const todayPoints = pointsMap[m.discordId] ?? 0;
       if (todayPoints >= dg.goalPoints) continue;

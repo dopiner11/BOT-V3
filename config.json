@@ -5,6 +5,16 @@
     "clientId": "1393136498760482928",
     "guildId": "1383643556194943108"
   },
+  "gifs": {
+    "_label": "رسوم القرارات (GIF) التي تُرسل قبل كل قرار",
+    "warn": "https://media.discordapp.net/attachments/1391704768660901919/1453017759565746197/934_x_175_.gif",
+    "promote": "https://media.discordapp.net/attachments/1391704768660901919/1453017759565746197/934_x_175_.gif?ex=6979677d&is=697815fd&hm=25cad4a05c4c0a463592f296df1c220c508c3093b37c177bc0b332df019ded5a=&width=1553&height=291",
+    "fire": "https://media.discordapp.net/attachments/1391704768660901919/1453017755392671899/934_x_175_.gif",
+    "vacation": "https://media.discordapp.net/attachments/1391704768660901919/1453019015277711442/934_x_175_.gif?ex=697968a9&is=69781729&hm=4a1ecf0c0f3376e6f4eed6cea4987932d7951336dcc7ec713293c83c43c5443b&=&width=400&height=75",
+    "scenario": "https://media.discordapp.net/attachments/1391704768660901919/1453017760354533487/934_x_175_.gif?ex=6a217ebd&is=6a202d3d&hm=701cfed9bda4f86e99ffc1cd661fd2a3d8b6aea0a50d478a0f46e6245a5bf159&=&width=400&height=75",
+    "scenarioVote": "",
+    "competition": "https://media.discordapp.net/attachments/1391704768660901919/1453017760354533487/934_x_175_.gif?ex=6a28befd&is=6a276d7d&hm=d145ca177cd25e058194566895570db4242d8e2e50af39d5fbb7ccde0effb877&=&width=1552&height=291"
+  },
   "application": {
     "_label": "إعدادات نموذج التقديم للعائلة",
     "title": "🌹 التقديم للعائلة",
@@ -140,7 +150,7 @@
         "supportRoleIds": [
           "1389190409317646336"
         ],
-        "categoryId": "1414300340475396107"
+        "categoryId": "1524180541002485770"
       },
       {
         "value": "auction_request",
@@ -150,7 +160,7 @@
         "supportRoleIds": [
           "1389190409317646336"
         ],
-        "categoryId": "1414300340475396107"
+        "categoryId": "1391173429549600888"
       },
       {
         "value": "black_market_application",
@@ -182,7 +192,7 @@
           "1389190409317646336",
           "1463117410394570752"
         ],
-        "categoryId": "1414300340475396107"
+        "categoryId": "1524180541002485770"
       }
     ],
     "panelMessageId": "1504739465154003026",
@@ -368,11 +378,11 @@
       },
       "dmOnViolation": {
         "_label": "بعت إشعار خاص للمخالف؟",
-        "value": true
+        "value": false
       },
       "dmOnInactive": {
         "_label": "بعت إشعار خاص للخامل؟",
-        "value": false
+        "value": true
       }
     },
     "streakMilestones": {
@@ -400,6 +410,22 @@
         }
       ]
     }
+  },
+  "dailyGuide": {
+    "_label": "نظام الإشعارات اليومية للعضو — رسائل يومية بروم العضو الشخصي (خطة الصباح + إشعار الإنجاز + تنبيه نهاية اليوم)",
+    "enabled": true,
+    "morningHour": 8,
+    "_label_morningHour": "ساعة إرسال خطة اليوم (بتوقيت بغداد)",
+    "morningMinute": 0,
+    "endOfDayHour": 23,
+    "_label_endOfDayHour": "ساعة تنبيه نهاية اليوم للمخالفين/الخاملين",
+    "endOfDayMinute": 0,
+    "goalPoints": null,
+    "_label_goalPoints": "النقاط المطلوبة يومياً عشان العضو يصير متفاعل 🟢 — null = يتّبع حد المتفاعل (activeThreshold) تلقائياً، أو ضع رقم لتثبيته يدوياً",
+    "useRoom": true,
+    "_label_useRoom": "الإرسال بروم العضو الشخصي (roomChannelId)",
+    "helpChannelId": "1459615234451968022",
+    "_label_helpChannelId": "روم قناة التقارير/المساعدة — يُظهره بالرسائل"
   },
   "warnings": {
     "_label": "نظام العقوبات والإنذارات",
@@ -432,22 +458,6 @@
         "_label": "قناة GIF التحذير (املأ الآيدي)"
       }
     }
-  },
-  "dailyGuide": {
-    "_label": "الإشعارات اليومية - خطة اليوم وتذكير نهاية اليوم وغرف الأعضاء",
-    "enabled": false,
-    "_label_morning": "موعد إرسال خطة اليوم الصباحية (بغداد)",
-    "morningHour": 8,
-    "morningMinute": 0,
-    "_label_endOfDay": "موعد تنبيه نهاية اليوم (بغداد)",
-    "endOfDayHour": 23,
-    "endOfDayMinute": 0,
-    "_label_goal": "الهدف اليومي بالنقاط (اتركه null = يتبع حد المتفاعل تلقائياً)",
-    "goalPoints": null,
-    "_label_useRoom": "يرسل في غرفة العضو الشخصية بدل الرسائل الخاصة",
-    "useRoom": true,
-    "_label_help": "روم المساعدة (منشن عند الحاجة)",
-    "helpChannelId": ""
   },
   "promotion": {
     "_label": "نظام الرتب والترقيات",
@@ -537,14 +547,14 @@
   },
   "attendance": {
     "_label": "نظام الحضور والاحتلال",
-    "panelChannelId": "1472547649919123620",
-    "feedChannelId": "1472547859424481280",
+    "panelChannelId": "1548935552588451900",
+    "feedChannelId": "1388879370231484556",
     "adminLogChannelId": "1505130196427083946",
     "minSessionMinutes": 10,
     "maxSessionMinutes": 1440,
     "voiceChannelIds": [
-      "1397231088245670021",
-      "1505149083222806648"
+      "1548934789908795463",
+      "1548935016908857474"
     ],
     "voiceWarningChannelId": "1388879370231484556",
     "voiceGracePeriodMinutes": 10,
@@ -556,15 +566,15 @@
   },
   "dailyChallenge": {
     "_label": "نظام التحديات اليومية - يُرسل تحديات للأعضاء كل يوم مع مكافآت",
-    "enabled": false,
+    "enabled": true,
     "assignTime": "04:00",
     "reminderTime": "14:00",
     "expireTime": "21:00",
-    "autoAssignOnStartup": true,
+    "autoAssignOnStartup": false,
     "logChannelId": "1506861337324818522",
     "challengeTypes": {
       "occupation": {
-        "enabled": true,
+        "enabled": false,
         "variants": [
           60,
           90,
@@ -580,7 +590,7 @@
         "label": "سجّل {hours} ساعة في نظام الاحتلال"
       },
       "reports": {
-        "enabled": true,
+        "enabled": false,
         "variants": [
           3,
           5,
@@ -598,7 +608,7 @@
         "label": "قدّم {count} تقارير"
       },
       "points": {
-        "enabled": true,
+        "enabled": false,
         "variants": [
           100,
           150,
@@ -614,23 +624,23 @@
         "label": "اجمع {points} نقطة"
       },
       "golden_12h": {
-        "enabled": true,
+        "enabled": false,
         "requirement": 80,
         "reward": 60,
         "label": "اجمع أول 80 نقطة في أول 12 ساعة"
       },
       "top_points": {
-        "enabled": true,
+        "enabled": false,
         "reward": 100,
         "label": "كن الأكثر نقاطاً اليوم"
       },
       "top_occupation": {
-        "enabled": true,
+        "enabled": false,
         "reward": 100,
         "label": "كن الأكثر ساعات احتلال اليوم"
       },
       "top_reports": {
-        "enabled": true,
+        "enabled": false,
         "reward": 100,
         "label": "كن الأكثر تقارير اليوم"
       }
@@ -638,7 +648,7 @@
   },
   "broadcast": {
     "_label": "نظام البرودكاست - إرسال رسائل جماعية للأعضاء عبر بوت ثانوي",
-    "enabled": true,
+    "enabled": false,
     "senderBot": {
       "clientId": "1395320600129437716",
       "token": "MTM5NTMyMDYwMDEyOTQzNzcxNg.GAgA2k.yawMzoseVPRh-oB__N6aXdyl_L8EwNU2-Ie-iY"
@@ -649,7 +659,7 @@
   },
   "welcomeGuide": {
     "_label": "نظام دليل الترحيب - يرسل دليل تفاعلي للأعضاء الجدد",
-    "autoSend": true,
+    "autoSend": false,
     "thumbnail": "",
     "color": "#FFD700",
     "deployed": true,
@@ -697,6 +707,15 @@
       "warnings_title": "🟤 تحذيراتك",
       "warnings_color": "#E74C3C"
     }
+  },
+  "welcomeSystem": {
+    "_label": "نظام الترحيب - رتبة ونيك نيم للأعضاء الجدد عند دخول السيرفر",
+    "enabled": true,
+    "_label_enabled": "تفعيل النظام (رتبة الترحيب + تحديد الاسم)",
+    "nicknamePrefix": "KR • ",
+    "_label_nicknamePrefix": "بادئة الاسم الترحيبي",
+    "setNickname": true,
+    "_label_setNickname": "تغيير النيك نيم للعضو الجديد"
   },
   "logChannels": {
     "_label": "قنوات السجلات - كل نوع حدث له قناة خاصة",
@@ -755,6 +774,10 @@
       "id": "1388879971677634631",
       "_label": "رتبة العضو الأساسية (أول ما ينضم)"
     },
+    "welcome": {
+      "id": "1388923636450066442",
+      "_label": "رتبة الترحيب - تُعطى للعضو عند دخول السيرفر"
+    },
     "admin": {
       "id": "1389190409317646336",
       "_label": "رتبة الإدارة العليا"
@@ -806,11 +829,15 @@
     "_label": "نظام اللجان - هنا تحدد الرتب (roles) لكل لجنة. الصلاحيات تحدد في utils/committeePermissions.js",
     "founders": [
       "1489892734184591511",
-      "1335667401836073038",
-      "1413594053639016551"
+      "1546119823258288190",
+      "1017703614304759848"
     ],
     "_label_authorizedUsers": "مستخدمون مصرح لهم - يتجاوزون الصلاحيات مثل المؤسسين",
-    "authorizedUsers": [],
+    "authorizedUsers": [
+      "1489892734184591511",
+      "1546119823258288190",
+      "1017703614304759848"
+    ],
     "panelChannelId": {
       "id": "1464607910548996176",
       "_label": "القناة الرئيسية اللي تظهر فيها لوحات اللجان"
@@ -824,14 +851,17 @@
     "_label": "إعدادات عامة للبوت",
     "activity": {
       "type": "STREAMING",
-      "name": "𓆩𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘𓆪",
+      "name": "𓆩𝐄𝐥.𝐊𝐛𝐞𝐫 𝐅𝐀𝐌𝐈𝐋𝐘𓆪",
       "url": "https://www.twitch.tv/discord"
     },
+    "presence": {
+      "status": "idle"
+    },
     "voiceChannelId": {
-      "id": "1461083909197398059",
+      "id": "1547540350946639913",
       "_label": "آيدي الروم الصوتي اللي يدخل فيه البوت (فارغ إذا ما تريد)"
     },
-    "playerChannelId": "1461083907410886849",
+    "playerChannelId": "1547541094441553940",
     "statusChannel": {
       "channelId": {
         "id": "1390313607677345853",
@@ -886,7 +916,9 @@
         "neutral": "#2B2D31",
         "gold": "#F1C40F"
       },
-      "footer": "𝐗.𝐈𝐑𝐀𝐐 𝐅𝐀𝐌𝐈𝐋𝐘",
+      "footer": "𝐄𝐥.𝐊𝐛𝐞𝐫 𝐅𝐀𝐌𝐈𝐋𝐘",
+      "footerIcon": "",
+      "thumbnail": "",
       "logFilters": {
         "minSeverityToChannel": 3
       }
@@ -912,9 +944,9 @@
     },
     "transcript": {
       "_label": "إعدادات حفظ نسخ التذاكر",
-      "saveToDatabase": true,
-      "generateHTML": true,
-      "generateTXT": true,
+      "saveToDatabase": false,
+      "generateHTML": false,
+      "generateTXT": false,
       "autoDeleteAfterDays": 30
     }
   },
@@ -952,30 +984,48 @@
         "id": "dua_kumayl",
         "name": "دعاء كميل",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          }
         ]
       },
       {
         "id": "dua_tawassul",
         "name": "دعاء التوسل",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" },
-          { "id": "mahmoud_sharifi", "name": "محمود شريفي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          },
+          {
+            "id": "mahmoud_sharifi",
+            "name": "محمود شريفي"
+          }
         ]
       },
       {
         "id": "dua_nudba",
         "name": "دعاء الندبة",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          }
         ]
       },
       {
         "id": "dua_ahd",
         "name": "دعاء العهد",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" },
-          { "id": "mahmoud_sharifi", "name": "محمود شريفي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          },
+          {
+            "id": "mahmoud_sharifi",
+            "name": "محمود شريفي"
+          }
         ]
       }
     ],
@@ -984,47 +1034,100 @@
         "id": "ziyarat_ashura",
         "name": "زيارة عاشوراء",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" },
-          { "id": "mahmoud_sharifi", "name": "محمود شريفي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          },
+          {
+            "id": "mahmoud_sharifi",
+            "name": "محمود شريفي"
+          }
         ]
       },
       {
         "id": "ziyarat_warith",
         "name": "زيارة وارث",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          }
         ]
       },
       {
         "id": "ziyarat_jamia",
         "name": "الزيارة الجامعة",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" },
-          { "id": "mahmoud_sharifi", "name": "محمود شريفي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          },
+          {
+            "id": "mahmoud_sharifi",
+            "name": "محمود شريفي"
+          }
         ]
       },
       {
         "id": "ziyarat_ameen_allah",
         "name": "زيارة أمين الله",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          }
         ]
       },
       {
         "id": "ziyarat_ale_yasin",
         "name": "زيارة آل ياسين",
         "reciters": [
-          { "id": "basim_karbalai", "name": "باسم الكربلائي" }
+          {
+            "id": "basim_karbalai",
+            "name": "باسم الكربلائي"
+          }
         ]
       }
     ]
   },
-  "antiNukeProtection": true,
+  "permissionSystem": {
+    "_label": "🛠️ نظام طلبات التعديل المراقب على السيرفر",
+    "enabled": true,
+    "approvers": [
+      "1489892734184591511",
+      "1546119823258288190",
+      "1017703614304759848"
+    ],
+    "_label_approvers": "IDs المخولين بالرد على طلبات التعديل (يُعدّلون يدوياً من config.json فقط)",
+    "editRoleId": "1398940398008926250",
+    "_label_editRoleId": "الرتبة الخاصة بالتعديل (تُضاف للعضو عند الموافقة وتُنشال عند الانتهاء)",
+    "maxDurationMinutes": 180,
+    "_label_maxDurationMinutes": "أقصى مدة تعديل مسموحة بالدقائق",
+    "monitorLogChannelId": "1390328692148015205",
+    "_label_monitorLogChannelId": "روم تسجيل أحداث المراقبة أثناء جلسة التعديل",
+    "suspicionThreshold": 100,
+    "_label_suspicionThreshold": "الحد اللي يلا يوصل له العضو يحاسب — يُسحب كل الرتب (0-100)",
+    "monitoring": {
+      "_label": "إعدادات المراقبة الذكية أثناء الجلسة",
+      "warnRatio": 0.4,
+      "_label_warnRatio": "نسبة النقاط اللي تُرسل عندها أول تحذير للعضو وللمخولين (مع زر إلغاء الجلسة)",
+      "strongWarnRatio": 0.7,
+      "_label_strongWarnRatio": "نسبة النقاط اللي يُرسل عندها تحذير قوي للمخولين مع زر إلغاء الجلسة",
+      "toneDecayMs": 10000,
+      "_label_toneDecayMs": "بعد هذي المدة بدون أي نشاط تصفر نقاط المراقبة طبيعياً"
+    }
+  },
+  "antiNukeProtection": false,
   "antiNuke": {
     "_label": "🛡️ نظام الحماية المتطور - Anti Nuke",
     "enabled": true,
     "logChannelId": "1390328692148015205",
-    "bypassRoleIds": ["1388879998739288154","1390306526136373312"],
+    "bypassRoleIds": [
+      "1451612325927714927",
+      "1388879998739288154"
+    ],
+    "trustedBotIds": [],
+    "_label_trustedBotIds": "آيديات بوتات إضافية موثوقة — أفعالها ذي أفعال البوت نفسه (ما تنحسب على أحد ولا تنعاد منها حماية)",
     "exceptionMultiplier": 2,
     "exceptionEscalateToBan": true,
     "exemption": {
@@ -1084,21 +1187,52 @@
         "_label": "مستويات العقوبات",
         "low": {
           "_label": "🟢 بسيط — سبام، منشن، إيموجي، رسائل",
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "timeout", "timeoutMinutes": 10, "log": true },
-          "strike3": { "action": "timeout", "timeoutMinutes": 60, "log": true }
+          "strike1": {
+            "action": "dm",
+            "log": false
+          },
+          "strike2": {
+            "action": "timeout",
+            "timeoutMinutes": 10,
+            "log": true
+          },
+          "strike3": {
+            "action": "timeout",
+            "timeoutMinutes": 60,
+            "log": true
+          }
         },
         "medium": {
           "_label": "🟡 متوسط — رتب، رومات، تايم آوت، فك باند",
-          "strike1": { "action": "dm", "log": false },
-          "strike2": { "action": "strip_admin", "timeoutMinutes": 30, "log": true },
-          "strike3": { "action": "ban", "log": true }
+          "strike1": {
+            "action": "dm",
+            "log": false
+          },
+          "strike2": {
+            "action": "strip_admin",
+            "timeoutMinutes": 30,
+            "log": true
+          },
+          "strike3": {
+            "action": "ban",
+            "log": true
+          }
         },
         "critical": {
           "_label": "🔴 خطير — حذف رتب/رومات، باند، ويب هوك، كيك",
-          "strike1": { "action": "strip_admin", "timeoutMinutes": 60, "log": true },
-          "strike2": { "action": "ban", "log": true },
-          "strike3": { "action": "ban", "log": true }
+          "strike1": {
+            "action": "strip_admin",
+            "timeoutMinutes": 60,
+            "log": true
+          },
+          "strike2": {
+            "action": "ban",
+            "log": true
+          },
+          "strike3": {
+            "action": "ban",
+            "log": true
+          }
         }
       },
       "mapping": {

@@ -321,7 +321,7 @@ function sectionMeta(sectionId) {
 }
 
 function buildHomeEmbed(config) {
-  const v = (obj, fallback) => (obj && 'value' in obj ? obj.value : (obj ?? fallback));
+  const v = (obj, fallback) => (obj && typeof obj === 'object' && 'value' in obj ? obj.value : (obj ?? fallback));
   const fields = [
     {
       name: '👑 اللجان',

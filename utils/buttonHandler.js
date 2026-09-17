@@ -345,6 +345,15 @@ async function handleApplicationAccept(interaction) {
 
     try {
         const { createTicket } = await import('./ticketManager.js');
+        // إغلاق أي تذكرة تطبيق مفتوحة للمستخدم قبل فتح تذكرة القبول (تم اتخاذ القرار)
+        const { default: Ticket } = await import('../models/Ticket.js');
+        const openAppTicket = await Ticket.findOne({ userId: app.userId, status: { $in: ['open', 'claimed'] }, type: 'application' });
+        if (openAppTicket) {
+            openAppTicket.status = 'closed';
+            openAppTicket.closeReason = 'تم قبول التقديم وإنشاء تذكرة جديدة';
+            await openAppTicket.save();
+        }
+
         const ticket = await createTicket(interaction.guild, app.userId, 'application');
 
         app.status = 'accepted';

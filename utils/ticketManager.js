@@ -68,12 +68,27 @@ export async function createTicket(guild, userId, type = 'application') {
 
     // Check for active tickets (Skip check for Black Market Sales/Apps)
     if (type !== 'black_market_sale' && type !== 'black_market_application') {
-      const activeTicket = await Ticket.findOne({
+      const activeTickets = await Ticket.find({
         userId,
         status: { $in: ['open', 'claimed'] }
       });
 
-      if (activeTicket) {
+      for (const activeTicket of activeTickets) {
+        // إذا كانت قناة التذكرة محذوفة نعتبرها مغلقة تلقائياً ونسمح بفتح تذكرة جديدة
+        if (activeTicket.channelId && activeTicket.channelId !== 'pending') {
+          let existingChannel = guild.channels.cache.get(activeTicket.channelId);
+          if (!existingChannel) {
+            existingChannel = await guild.channels.fetch(activeTicket.channelId).catch(() => null);
+          }
+          if (!existingChannel) {
+            activeTicket.status = 'closed';
+            activeTicket.closeReason = 'تم حذف القناة يدوياً (أغلقت تلقائياً)';
+            activeTicket.closedAt = new Date();
+            await activeTicket.save();
+            console.log(`🗑️ [أغلقت تلقائياً بسبب حذف القناة]: تذكرة #${activeTicket.ticketNumber}`);
+            continue;
+          }
+        }
         throw new Error('❌ لديك تذكرة مفتوحة بالفعل! يجب إغلاقها قبل فتح تذكرة جديدة.');
       }
     }

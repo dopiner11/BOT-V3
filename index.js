@@ -631,6 +631,20 @@ client.on(Events.ChannelDelete, async (channel) => {
   } catch (e) { console.error('AntiNuke Error:', e.message); }
 });
 
+client.on(Events.ChannelDelete, async (channel) => {
+  try {
+    if (channel.isDMBased()) return;
+    const { default: Ticket } = await import('./models/Ticket.js');
+    const result = await Ticket.updateMany(
+      { channelId: channel.id, status: { $in: ['open', 'claimed'] } },
+      { status: 'closed', closeReason: 'تم حذف القناة يدوياً (أغلقت تلقائياً)', closedAt: new Date() }
+    );
+    if (result.modified > 0) {
+      console.log(`🗑️ [أغلقت التذاكر بسبب حذف القناة]: ${channel.id} (${result.modified} تذكرة)`);
+    }
+  } catch (e) { console.error('Ticket ChannelDelete Error:', e.message); }
+});
+
 client.on(Events.ChannelCreate, async (channel) => {
   try {
     if (channel.isDMBased()) return;
